@@ -2,13 +2,13 @@
 """
 DISCLAIMER:
 Ce code est fourni à titre éducatif uniquement. Je ne suis pas un conseiller financier.
-L'utilisation de ce système en conditions réelles, notamment avec effet de levier et trading haute fréquence,
+L'utilisation de ce système en conditions réelles, notamment avec trading haute fréquence,
 peut entraîner des pertes importantes. Testez ce système en simulation ou sur le testnet de Binance Futures avant toute utilisation en réel.
 Objectif très ambitieux : atteindre 1 BTC en 1 mois (objectif extrêmement risqué).
 
 Ce script s'inspire de la méthodologie présentée dans la thèse
 "High-Frequency Algorithmic Bitcoin Trading Using Both Financial and Social Features"
-de l'Université d'Amsterdam. Il se concentre ici uniquement sur le trading de BTC/USDT en utilisant
+de l'Université d'Amsterdam. Il se concentre ici sur le trading de BTC/USDT en utilisant
 des indicateurs financiers (SMA, RSI, MACD, Bollinger Bands) et un modèle Random Forest préalablement entraîné
 (sauvegardé sous le nom 'model_rf.pkl'). Avant de commencer, une fonction d'initialisation transfère
 la totalité des fonds du compte Spot vers le compte Futures (USDT, BTC et BNB) en vérifiant que les minimums requis sont respectés.
@@ -17,10 +17,10 @@ la totalité des fonds du compte Spot vers le compte Futures (USDT, BTC et BNB) 
 import ccxt
 import numpy as np
 import time
-import feedparser
 import joblib
 import os
 import pandas as pd
+import sys
 
 # ----- Paramètres globaux pour le trading -----
 WINDOW_SIZE = 50        # Nombre de points historiques pour les indicateurs
@@ -31,17 +31,8 @@ MACD_SIGNAL = 9         # Période de la ligne signal pour MACD
 COOLDOWN = 0.5          # Cooldown en secondes entre deux trades sur une même paire
 SLEEP_INTERVAL = 0.1    # Intervalle de boucle
 
-# Paramètres pour l'effet de levier et stop-loss
-LEVERAGE = 20           # Par exemple, 20x de levier
-STOP_LOSS_PERCENT = 1.0 # Stop-loss à 1% en dessous du prix d'entrée (optionnel)
-
-# ----- Paramètres pour les actualités via RSS -----
-NEWS_INTERVAL = 300     # Actualiser les actualités toutes les 5 minutes
-NEWS_SOURCES = {
-    "CoinDesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
-    "CoinTelegraph": "https://cointelegraph.com/rss",
-    "CryptoSlate": "https://cryptoslate.com/feed/"
-}
+# On n'utilise pas d'effet de levier : les ordres seront exécutés sans levier (1x)
+STOP_LOSS_PERCENT = 1.0
 
 # ----- Fonction pour lire les clés API depuis un fichier texte -----
 def lire_cle_api(fichier):
@@ -87,20 +78,7 @@ SYMBOLS = ["BTC/USDT"]
 # ----- Historique des prix pour chaque symbole -----
 historique_prix = {symbol: [] for symbol in SYMBOLS}
 
-# ----- Dictionnaire pour le suivi du leverage -----
-leverage_set = {symbol: False for symbol in SYMBOLS}
-
-# ----- Fonction pour récupérer les actualités via RSS -----
-def recuperer_news():
-    news_summary = ""
-    for source, url in NEWS_SOURCES.items():
-        flux = feedparser.parse(url)
-        if flux.entries:
-            titres = [entry.get("title", "Titre non disponible") for entry in flux.entries[:2]]
-            news_summary += f"{source}: " + " | ".join(titres) + "\n"
-    return news_summary
-
-# ----- Fonctions techniques pour calculer les indicateurs financiers -----
+# ----- Fonctions pour calculer les indicateurs financiers -----
 def calculer_rsi(prices, period=RSI_PERIOD):
     if len(prices) < period + 1:
         return None
@@ -165,15 +143,20 @@ def calculer_quantite_dyn(symbol, side, current_price):
     """
     balance = exchange.fetch_balance({'type': 'future'})
     market = exchange.markets[symbol]
-    min_cost = market['limits']['cost']['min']
+    min_cost = float(market['limits']['cost']['min'])
     if side.lower() == 'buy':
-        available_usdt = balance.get('USDT', {}).get('free', 0)
+        available_usdt = float(balance.get('USDT', {}).get('free', 0))
+        min_order_amount = float(market['limits']['amount']['min'])
+        # Vérifier que les fonds permettent d'acheter au moins min_order_amount BTC
+        if available_usdt < current_price * min_order_amount:
+            print(f"[ALERTE] Fonds insuffisants pour BUY: il faut au moins {current_price * min_order_amount:.2f} USDT pour acheter {min_order_amount} BTC, disponibles: {available_usdt} USDT.")
+            return None
         print(f"[DEBUG] Disponible USDT pour BUY: {available_usdt}")
         quantite = available_usdt / current_price
         print(f"[DEBUG] Quantité brute calculée pour BUY: {quantite}")
     elif side.lower() == 'sell':
         asset = symbol.split('/')[0]
-        available_asset = balance.get(asset, {}).get('free', 0)
+        available_asset = float(balance.get(asset, {}).get('free', 0))
         print(f"[DEBUG] Disponible {asset} pour SELL: {available_asset}")
         quantite = available_asset
     else:
@@ -186,20 +169,19 @@ def calculer_quantite_dyn(symbol, side, current_price):
 # ----- Ajustement et arrondi de la quantité -----
 def ajuster_quantite(symbol, side, quantite, current_price):
     market = exchange.markets[symbol]
-    # Forcer un seuil minimum personnalisé pour éviter l'alerte (ici 1e-8)
-    min_amount = 1e-8  
-    min_cost = market['limits']['cost']['min']
+    min_order_amount = float(market['limits']['amount']['min'])  # par exemple, 0.001 BTC pour BTC/USDT
+    min_cost = float(market['limits']['cost']['min'])
     required_by_cost = min_cost / current_price
-    quantite_valide = max(quantite, required_by_cost, min_amount)
+    quantite_valide = max(quantite, required_by_cost, min_order_amount)
     
     balance = exchange.fetch_balance({'type': 'future'})
     if side.lower() == 'buy':
-        available_usdt = balance.get('USDT', {}).get('free', 0)
+        available_usdt = float(balance.get('USDT', {}).get('free', 0))
         if current_price * quantite_valide > available_usdt:
             quantite_valide = available_usdt / current_price
     elif side.lower() == 'sell':
         asset = symbol.split('/')[0]
-        available_asset = balance.get(asset, {}).get('free', 0)
+        available_asset = float(balance.get(asset, {}).get('free', 0))
         if quantite_valide > available_asset:
             quantite_valide = available_asset
     
@@ -207,25 +189,44 @@ def ajuster_quantite(symbol, side, quantite, current_price):
         print(f"[ALERTE] Quantité finale insuffisante pour {symbol}: {current_price * quantite_valide:.2f} USDT < min_cost {min_cost} USDT")
         return None
 
-    # Pour BTC, fixer la précision à 8 décimales
     precision = 8 if symbol.startswith("BTC") else 2
     quantite_finale = round(quantite_valide, precision)
-    if quantite_finale < min_amount:
-        print(f"[ALERTE] Quantité arrondie trop faible pour {symbol}: {quantite_finale} < min_amount {min_amount}")
+    
+    # Vérification : la quantité finale doit être au moins égale à 0.001 BTC
+    if quantite_finale < 0.001:
+        print(f"[ERREUR] Quantité finale ajustée ({quantite_finale}) inférieure au minimum requis (0.001 BTC) pour {symbol}.")
         return None
+
     print(f"[DEBUG] Quantité finale ajustée pour {symbol}: {quantite_finale}")
     return quantite_finale
 
+# ----- Exécution de l'ordre sans effet de levier (1x) -----
+def executer_ordre(symbol, decision, quantite_finale, current_price):
+    try:
+        if decision == "BUY":
+            ordre = exchange.create_market_buy_order(symbol, quantite_finale, params={"reduceOnly": False})
+            try:
+                stop_price = current_price * (1 - STOP_LOSS_PERCENT / 100)
+                ordre_stop = exchange.create_order(
+                    symbol, 
+                    type="stop_market", 
+                    side="sell", 
+                    amount=quantite_finale, 
+                    params={"stopPrice": stop_price, "reduceOnly": False}
+                )
+                print(f"[STOP-LOSS] Ordre stop-loss placé pour {symbol} à {stop_price:.2f} USDT.")
+            except Exception as e:
+                print(f"[ERREUR] Placement du stop-loss pour {symbol} : {e}")
+        elif decision == "SELL":
+            ordre = exchange.create_market_sell_order(symbol, quantite_finale, params={"reduceOnly": False})
+        print(f"[TRADE] Ordre {decision} exécuté sur {symbol} avec {quantite_finale} (Prix: {current_price})\nRésultat: {ordre}")
+        return ordre
+    except Exception as e:
+        print(f"[ERREUR] Exécution du trade {decision} sur {symbol}: {e}")
+        return None
+
 # ----- Prédiction de la décision via Random Forest pour BTC -----
 def predire_decision(symbol, current_price, moving_average, rsi, macd, signal_line, bbands):
-    """
-    Construit un vecteur de caractéristiques et utilise un modèle Random Forest préalablement entraîné,
-    sauvegardé dans 'model_rf.pkl', pour prédire la direction du marché.
-    Caractéristiques utilisées (9 features) :
-      - Indicateurs financiers : prix actuel, SMA, RSI, MACD, Signal, Bollinger Bands (Lower, SMA, Upper)
-      - Une caractéristique sociale : pour BTC, la valeur par défaut est 0.
-    La prédiction renvoie 1 (BUY), -1 (SELL) ou 0 (HOLD).
-    """
     lower_bb, sma_bb, upper_bb = bbands if bbands is not None else (0, 0, 0)
     features = [
         current_price,
@@ -281,13 +282,23 @@ def logique_trading(symbol, last_trade_time):
     decision = predire_decision(symbol, current_price, moving_average, rsi, macd, signal_line, bbands)
     print(f"[INFO] Décision prédite pour {symbol} : {decision}")
     
-    # Logique de fallback : si le modèle prédit HOLD, forcer un trade selon le RSI
+    # Fallback pour SELL : si la quantité BTC disponible est inférieure au minimum requis, forcer BUY.
+    if decision == "SELL":
+        balance = exchange.fetch_balance({'type': 'future'})
+        available_btc = float(balance.get("BTC", {}).get("free", 0))
+        min_order_amount = float(exchange.markets[symbol]['limits']['amount']['min'])
+        if available_btc < min_order_amount:
+            decision = "BUY"
+            print(f"[FALLBACK] Quantité BTC disponible ({available_btc}) inférieure à {min_order_amount}, forçant BUY.")
+            print(f"[INFO] Décision modifiée par fallback pour {symbol} : {decision}")
+    
+    # Fallback général : si le modèle prédit HOLD, forcer un trade selon le RSI
     if decision == "HOLD" and rsi is not None:
         balance = exchange.fetch_balance({'type': 'future'})
-        available_btc = balance.get("BTC", {}).get("free", 0)
-        if available_btc <= 0:
+        available_btc = float(balance.get("BTC", {}).get("free", 0))
+        if available_btc < float(exchange.markets[symbol]['limits']['amount']['min']):
             decision = "BUY"
-            print("[FALLBACK] Aucun BTC disponible pour SELL, forçant BUY.")
+            print("[FALLBACK] Quantité BTC insuffisante pour SELL, forçant BUY.")
         else:
             if rsi <= 50:
                 decision = "BUY"
@@ -297,28 +308,11 @@ def logique_trading(symbol, last_trade_time):
                 print("[FALLBACK] RSI > 50, forçant SELL.")
         print(f"[INFO] Décision modifiée par fallback pour {symbol} : {decision}")
     
-    # Si le modèle prédit SELL et qu'il n'y a pas de BTC disponible, forcer BUY pour utiliser les fonds USDT
-    if decision == "SELL":
-        balance = exchange.fetch_balance({'type': 'future'})
-        available_btc = balance.get("BTC", {}).get("free", 0)
-        if available_btc <= 0:
-            decision = "BUY"
-            print("[FALLBACK] Aucune quantité BTC pour SELL, forçant BUY.")
-            print(f"[INFO] Décision modifiée par fallback pour {symbol} : {decision}")
-    
     if decision in ["BUY", "SELL"]:
         now = time.time()
         if now - last_trade_time.get(symbol, 0) < COOLDOWN:
             print(f"[INFO] Cooldown actif pour {symbol}. Aucun trade n'est passé.")
             return last_trade_time
-        
-        if not leverage_set[symbol]:
-            try:
-                exchange.set_leverage(LEVERAGE, symbol)
-                leverage_set[symbol] = True
-                print(f"[INFO] Leverage {LEVERAGE}x appliqué pour {symbol}.")
-            except Exception as e:
-                print(f"[ERREUR] Échec de configuration du leverage pour {symbol}: {e}")
         
         quantite_calculee = calculer_quantite_dyn(symbol, decision, current_price)
         if quantite_calculee is None or quantite_calculee == 0:
@@ -330,31 +324,20 @@ def logique_trading(symbol, last_trade_time):
             print(f"[INFO] Quantité finale = 0, aucun trade exécuté pour {symbol} {decision}.")
             return last_trade_time
         
-        # Debug: calcul de la valeur notionnelle
-        notional = current_price * quantite_finale
-        print(f"[DEBUG] Notional de l'ordre: {notional:.2f} USDT (min requis: {exchange.markets[symbol]['limits']['cost']['min']} USDT)")
+        # Pour SELL, vérification supplémentaire : la quantité doit être au moins égale au minimum requis
+        min_order_amount = float(exchange.markets[symbol]['limits']['amount']['min'])
+        if decision == "SELL" and quantite_finale < min_order_amount:
+            print(f"[ERREUR] Quantité finale ({quantite_finale}) pour SELL est inférieure au minimum requis ({min_order_amount}). Aucun trade exécuté.")
+            return last_trade_time
         
-        try:
-            if decision == "BUY":
-                ordre = exchange.create_market_buy_order(symbol, quantite_finale, params={"reduceOnly": False})
-                try:
-                    stop_price = current_price * (1 - STOP_LOSS_PERCENT / 100)
-                    ordre_stop = exchange.create_order(
-                        symbol, 
-                        type="stop_market", 
-                        side="sell", 
-                        amount=quantite_finale, 
-                        params={"stopPrice": stop_price, "reduceOnly": False}
-                    )
-                    print(f"[STOP-LOSS] Ordre stop-loss placé pour {symbol} à {stop_price:.2f} USDT.")
-                except Exception as e:
-                    print(f"[ERREUR] Placement du stop-loss pour {symbol} : {e}")
-            elif decision == "SELL":
-                ordre = exchange.create_market_sell_order(symbol, quantite_finale, params={"reduceOnly": False})
-            print(f"[TRADE] Ordre {decision} exécuté sur {symbol} avec {quantite_finale} (Prix: {current_price})\nRésultat: {ordre}")
+        notional = current_price * quantite_finale
+        min_cost = float(exchange.markets[symbol]['limits']['cost']['min'])
+        print(f"[DEBUG] Notional de l'ordre: {notional:.2f} USDT (min requis: {min_cost} USDT)")
+        
+        ordre = executer_ordre(symbol, decision, quantite_finale, current_price)
+        if ordre is not None:
+            print(f"[INFO] Ordre exécuté.")
             last_trade_time[symbol] = now
-        except Exception as e:
-            print(f"[ERREUR] Exécution du trade {decision} sur {symbol}: {e}")
     else:
         print(f"[INFO] Le modèle prédit HOLD pour {symbol}. Aucun trade n'est exécuté.")
     return last_trade_time
@@ -364,8 +347,8 @@ def transfer_bnb_to_futures():
     try:
         spot_balance = exchange.fetch_balance({'type': 'spot'})
         futures_balance = exchange.fetch_balance({'type': 'future'})
-        bnb_spot = spot_balance.get('BNB', {}).get('free', 0)
-        bnb_futures = futures_balance.get('BNB', {}).get('free', 0)
+        bnb_spot = float(spot_balance.get('BNB', {}).get('free', 0))
+        bnb_futures = float(futures_balance.get('BNB', {}).get('free', 0))
         print(f"[INFO] Solde Spot BNB: {bnb_spot}, Solde Futures BNB: {bnb_futures}")
         if bnb_spot > 0:
             print(f"[INFO] Transfert de {bnb_spot} BNB du compte Spot vers Futures pour réduction des frais.")
@@ -383,8 +366,8 @@ def initialize_funds():
         futures_balance = exchange.fetch_balance({'type': 'future'})
         
         # Transfert USDT : transférer tout le solde USDT du Spot vers Futures
-        usdt_spot = spot_balance.get('USDT', {}).get('free', 0)
-        usdt_futures = futures_balance.get('USDT', {}).get('free', 0)
+        usdt_spot = float(spot_balance.get('USDT', {}).get('free', 0))
+        usdt_futures = float(futures_balance.get('USDT', {}).get('free', 0))
         print(f"[INFO] Solde Spot USDT: {usdt_spot}, Solde Futures USDT: {usdt_futures}")
         if usdt_spot > 0:
             print(f"[INFO] Transfert de {usdt_spot} USDT du compte Spot vers Futures.")
@@ -394,8 +377,8 @@ def initialize_funds():
             print("[INFO] Aucune USDT à transférer.")
         
         # Transfert BTC : transférer tout le solde BTC du Spot vers Futures
-        btc_spot = spot_balance.get('BTC', {}).get('free', 0)
-        btc_futures = futures_balance.get('BTC', {}).get('free', 0)
+        btc_spot = float(spot_balance.get('BTC', {}).get('free', 0))
+        btc_futures = float(futures_balance.get('BTC', {}).get('free', 0))
         print(f"[INFO] Solde Spot BTC: {btc_spot}, Solde Futures BTC: {btc_futures}")
         if btc_spot > 0:
             print(f"[INFO] Transfert de {btc_spot} BTC du compte Spot vers Futures.")
@@ -412,21 +395,13 @@ def initialize_funds():
 
 # ----- Fonction principale -----
 def main():
-    global leverage_set
-    leverage_set = {symbol: False for symbol in SYMBOLS}
     last_trade_time = {symbol: 0 for symbol in SYMBOLS}
     iteration = 0
-    last_news_time = 0
-    print("[INFO] Démarrage du système de trading HFT pour BTC avec Random Forest...\n")
+    print("[INFO] Démarrage du système de trading HFT pour BTC avec Random Forest (sans effet de levier)...\n")
     
     initialize_funds()
     afficher_portefeuille()
     while True:
-        current_time = time.time()
-        if current_time - last_news_time > NEWS_INTERVAL:
-            print("\n[NEWS] Actualités récentes:")
-            print(recuperer_news())
-            last_news_time = current_time
         for symbol in SYMBOLS:
             last_trade_time = logique_trading(symbol, last_trade_time)
         iteration += 1
