@@ -1,0 +1,41 @@
+# Core dependencies
+streamlit==1.29.0
+solana==0.30.2
+anchorpy==0.18.0
+plotly==6.0.0
+
+# Data manipulation
+pandas>=2.0.0
+numpy>=1.24.0
+
+# API and requests
+requests>=2.31.0
+python-dotenv==1.0.0
+openai>=0.27.0
+websockets>=10.3
+
+# Development tools
+black==23.12.1
+pylint==3.0.3
+pytest==7.4.4
+
+# Optional - for enhanced features
+python-binance>=1.0.19
+tweepy>=4.14.0
+ccxt>=4.1.87
+
+# Machine Learning dependencies
+scikit-learn>=1.0.2
+joblib==1.2.0
+
+# GPU support for Mac (Apple Silicon) using Metal
+tensorflow-macos==2.16.2
+tensorflow-metal==1.2.0
+
+# For Telegram bot functionality
+PyTelegramBotAPI==4.26.0
+
+# Yggdrasil Decision Forests (YDF)
+ydf==0.9.0
+# Logging with Color Output
+colorlog>=6.7.0
