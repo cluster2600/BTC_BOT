@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 """
-Main Trading Bot with Ensemble Model Integration
+Main Trading Bot with Ensemble Model Integration, Forced Minimum Order Sizes, and Binance Testnet Support
 
-This module integrates an enhanced trading model ensemble that combines:
-  1. A YDF Random Forest model.
-  2. A TensorFlow neural network model.
+This module integrates:
+  1. An ensemble model that combines predictions from a YDF Random Forest model and a TensorFlow neural network model.
+  2. Order sizing logic that forces:
+       - BUY orders to have a notional value of at least 100 USDT.
+       - SELL orders to have a minimum quantity of 0.00105 BTC and a notional of at least 100 USDT.
+  3. Market data ingestion, strategy execution, error logging, and order management.
+  4. Option to connect to Binance Futures Testnet for safe testing.
+  5. Profit display every minute.
   
-The ensemble pipeline:
-  - Generates features from market data.
-  - Uses both models (via ensemble_models.py) to produce predictions.
-  - Averages output probabilities and applies rule-based signals.
-  - Executes trades only if the ensemble and rules agree.
-  - Enforces a minimum order size of 100 USDT notional (BUY) or a forced minimum BTC quantity (SELL).
-
-This code is designed to run on a Mac M1 with Metal GPU acceleration.
+This code is designed to run on a Mac M1 (with Metal GPU acceleration if available).
 """
 
 import os
@@ -21,6 +19,7 @@ import sys
 import time
 import json
 import math
+import urllib.parse
 from datetime import datetime
 from typing import Any, Dict, Optional, List, Tuple
 
@@ -31,12 +30,17 @@ import requests
 import websocket
 import logging
 import colorlog
-import urllib.request  # Added to fix Telegram notification error
 
-# Import the ensemble model functions (assumed to be defined in ensemble_models.py)
-# The module should provide:
-#   load_ydf_model(), load_tf_model(), and ensemble_predict(features)
-from ensemble_models import load_ydf_model, load_tf_model, ensemble_predict
+from telebot import TeleBot, types
+
+# Import ensemble model functions from ensemble_models.py.
+from ensemble_models import load_ydf_model, load_tf_model, get_ensemble_decision
+
+##############################################
+#         GLOBAL CONFIGURATION               #
+##############################################
+TEST_MODE = True        # Set to True to run in simulation mode.
+USE_TESTNET = True      # Set to True to use Binance Futures Testnet.
 
 ##############################################
 #         LOGGER & UTILITY FUNCTIONS         #
@@ -121,7 +125,6 @@ if not BINANCE_API_KEY or not BINANCE_API_SECRET:
 ##############################################
 #         TELEGRAM BOT SETUP                 #
 ##############################################
-from telebot import TeleBot, types
 bot = TeleBot(TELEGRAM_TOKEN)
 
 def telegram_notify(message: str) -> Optional[Dict[str, Any]]:
@@ -143,36 +146,85 @@ custom_headers = {
     'X-MBX-APIKEY': BINANCE_API_KEY,
 }
 
-exchange_spot = ccxt.binance({
-    'apiKey': BINANCE_API_KEY,
-    'secret': BINANCE_API_SECRET,
-    'enableRateLimit': True,
-    'headers': custom_headers,
-})
+# Spot instance (used for funds transfer)
+if not TEST_MODE:
+    exchange_spot = ccxt.binance({
+        'apiKey': BINANCE_API_KEY,
+        'secret': BINANCE_API_SECRET,
+        'enableRateLimit': True,
+        'headers': custom_headers,
+    })
+else:
+    # Dummy exchange for testing.
+    class DummyExchange:
+        def __init__(self):
+            self._markets = {
+                "BTC/USDT:USDT": {"info": {"filters": [{"filterType": "LOT_SIZE", "stepSize": "0.00000001"}]}}
+            }
+        @property
+        def markets(self):
+            return self._markets
+        def fetch_balance(self, params=None):
+            return {'USDT': {'free': 412.22}, 'BTC': {'free': 0.00218558}, 'BNB': {'free': 0.00004510}}
+        def load_markets(self):
+            return self._markets
+        def fetch_ticker(self, symbol):
+            return {"last": 96000.0}
+        def create_market_buy_order(self, symbol, quantity, params):
+            return {"id": "test_buy", "symbol": symbol, "quantity": quantity}
+        def create_market_sell_order(self, symbol, quantity, params):
+            return {"id": "test_sell", "symbol": symbol, "quantity": quantity}
+        def transfer(self, asset, amount, from_account, to_account):
+            return {"status": "ok"}
+        def set_leverage(self, leverage, symbol):
+            return {"status": "ok"}
+    exchange_spot = DummyExchange()
 
-futures_config = {
-    'apiKey': BINANCE_API_KEY,
-    'secret': BINANCE_API_SECRET,
-    'enableRateLimit': True,
-    'options': {'defaultType': 'future'},
-    'urls': {
-        'api': {
-            'public': 'https://fapi.binance.com/fapi/v1',
-            'private': 'https://fapi.binance.com/fapi/v1'
+# Futures instance: use Testnet endpoints if USE_TESTNET is True.
+if not TEST_MODE:
+    if USE_TESTNET:
+        futures_config = {
+            'apiKey': BINANCE_API_KEY,
+            'secret': BINANCE_API_SECRET,
+            'enableRateLimit': True,
+            'options': {'defaultType': 'future'},
+            'urls': {
+                'api': {
+                    'public': 'https://testnet.binancefuture.com/fapi/v1',
+                    'private': 'https://testnet.binancefuture.com/fapi/v1'
+                }
+            },
+            'headers': custom_headers,
         }
-    },
-    'headers': custom_headers,
-}
-print_info("PRODUCTION mode activated for Futures using standard endpoint.")
-exchange_futures = ccxt.binance(futures_config)
+        print_info("Testnet mode activated for Futures.")
+    else:
+        futures_config = {
+            'apiKey': BINANCE_API_KEY,
+            'secret': BINANCE_API_SECRET,
+            'enableRateLimit': True,
+            'options': {'defaultType': 'future'},
+            'urls': {
+                'api': {
+                    'public': 'https://fapi.binance.com/fapi/v1',
+                    'private': 'https://fapi.binance.com/fapi/v1'
+                }
+            },
+            'headers': custom_headers,
+        }
+        print_info("Production mode activated for Futures using standard endpoint.")
+    exchange_futures = ccxt.binance(futures_config)
+else:
+    exchange_futures = exchange_spot  # In test mode, use dummy exchange.
 
 ##############################################
 #   FUND TRANSFER & INITIALIZATION FUNCTIONS   #
 ##############################################
+initial_futures_balance: Optional[float] = None
+
 def transfer_funds_spot_to_futures() -> None:
     try:
-        spot_bal = exchange_spot.fetch_balance({'type': 'spot'})
-        usdt_spot = float(spot_bal.get('USDT', {}).get('free', 0))
+        bal = exchange_spot.fetch_balance({'type': 'spot'})
+        usdt_spot = float(bal.get('USDT', {}).get('free', 0))
         if usdt_spot > 0:
             print_info(f"Transferring {usdt_spot} USDT from Spot to Futures.")
             result = exchange_futures.transfer('USDT', usdt_spot, 'spot', 'future')
@@ -181,8 +233,6 @@ def transfer_funds_spot_to_futures() -> None:
             print_info("No USDT available on Spot to transfer.")
     except Exception as e:
         print_error(f"Error transferring funds: {e}")
-
-initial_futures_balance: Optional[float] = None
 
 def initialize_funds() -> None:
     global initial_futures_balance
@@ -201,12 +251,11 @@ def display_portfolio() -> None:
     try:
         bal = exchange_futures.fetch_balance({'type': 'future'})
         usdt = float(bal.get('USDT', {}).get("free", 0))
-        base_asset = "BTC"
-        btc = float(bal.get(base_asset, {}).get("free", 0))
+        btc = float(bal.get('BTC', {}).get("free", 0))
         bnb = float(bal.get('BNB', {}).get("free", 0))
         print_info(f"[PORTFOLIO] Current balances:")
         print_info(f"  USDT: {usdt:.8f}")
-        print_info(f"  {base_asset}: {btc:.8f}")
+        print_info(f"  BTC: {btc:.8f}")
         print_info(f"  BNB: {bnb:.8f}")
     except Exception as e:
         print_error(f"Error displaying portfolio: {e}")
@@ -260,25 +309,24 @@ def calculate_bbands(prices: List[float], period: int = 50, num_std: int = 2) ->
 ##############################################
 #         ORDER SIZE & QUANTITY ADJUSTMENT   #
 ##############################################
+MIN_USDT = 100.0      # Minimum notional for BUY orders.
+MIN_BTC  = 0.00105    # Minimum BTC quantity for SELL orders.
+TRADE_PERCENTAGE = 0.10
+
 def adjust_lot_size(symbol: str, quantity: float) -> float:
     try:
         filters = exchange_futures.markets[symbol]['info'].get('filters', [])
-        step_size = None
+        lot_step = None
         for f in filters:
             if f.get('filterType') == 'LOT_SIZE':
-                step_size = float(f.get('stepSize'))
+                lot_step = float(f.get('stepSize'))
                 break
-        if step_size:
-            quantity = math.floor(quantity / step_size) * step_size
+        if lot_step:
+            quantity = math.floor(quantity / lot_step) * lot_step
         return quantity
     except Exception as e:
         print_error(f"Error adjusting lot size for {symbol}: {e}")
         return quantity
-
-# Forced minimums for BTC/USDT:
-MIN_USDT = 100.0      # For BUY orders, minimum notional is 100 USDT.
-MIN_BTC  = 0.00105    # For SELL orders, minimum BTC quantity is 0.0010500.
-TRADE_PERCENTAGE = 0.10
 
 def calculate_dynamic_quantity(symbol: str, side: str, current_price: float) -> Optional[float]:
     bal = exchange_futures.fetch_balance({'type': 'future'})
@@ -294,7 +342,6 @@ def calculate_dynamic_quantity(symbol: str, side: str, current_price: float) -> 
     return quantity
 
 def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price: float) -> Optional[float]:
-    # Retrieve lot step for rounding purposes
     filters = exchange_futures.markets[symbol]['info'].get('filters', [])
     lot_step = 1e-8
     for f in filters:
@@ -303,16 +350,17 @@ def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price
             break
 
     if side.upper() == 'BUY':
-        # Calculate forced quantity for 100 USDT notional
-        forced_qty = math.ceil((MIN_USDT / current_price) / lot_step) * lot_step
-        final_qty = max(calculated_qty, forced_qty)
+        forced_qty_buy = math.ceil((MIN_USDT / current_price) / lot_step) * lot_step
+        final_qty = max(calculated_qty, forced_qty_buy)
         bal = exchange_futures.fetch_balance({'type': 'future'})
         available_usdt = float(bal.get('USDT', {}).get("free", 0))
         if current_price * final_qty > available_usdt:
             final_qty = available_usdt / current_price
     elif side.upper() == 'SELL':
-        # Calculate forced quantity for 0.00105 BTC
-        forced_qty = math.ceil(MIN_BTC / lot_step) * lot_step
+        epsilon = 1e-8
+        forced_qty_btc = math.ceil((MIN_BTC + epsilon) / lot_step) * lot_step
+        forced_qty_notional = math.ceil((MIN_USDT / current_price) / lot_step) * lot_step
+        forced_qty = max(forced_qty_btc, forced_qty_notional)
         final_qty = max(calculated_qty, forced_qty)
         base_asset = symbol.split("/")[0]
         available_asset = float(exchange_futures.fetch_balance({'type': 'future'}).get(base_asset, {}).get("free", 0))
@@ -327,19 +375,31 @@ def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price
     debug_log(f"Final adjusted quantity for {symbol}: {final_qty}")
     return final_qty
 
-##############################################
-#            ORDER EXECUTION               #
-##############################################
 def execute_order(symbol: str, decision: str, final_quantity: float, current_price: float) -> Optional[Dict[str, Any]]:
+    filters = exchange_futures.markets[symbol]['info'].get('filters', [])
+    lot_step = 1e-8
+    for f in filters:
+        if f.get('filterType') == 'LOT_SIZE':
+            lot_step = float(f.get('stepSize'))
+            break
+
     if decision.upper() == "BUY":
         notional = current_price * final_quantity
         if notional < MIN_USDT:
             print_error(f"Forced BUY order notional {notional:.2f} USDT is below {MIN_USDT} USDT.")
-            final_quantity = math.ceil((MIN_USDT / current_price) / 1e-8) * 1e-8
+            forced_qty = math.ceil((MIN_USDT / current_price) / lot_step) * lot_step
+            final_quantity = forced_qty
     elif decision.upper() == "SELL":
         if final_quantity < MIN_BTC:
             print_error(f"Forced SELL quantity {final_quantity} BTC is below {MIN_BTC} BTC.")
-            final_quantity = math.ceil(MIN_BTC / 1e-8) * 1e-8
+            final_quantity = math.ceil(MIN_BTC / lot_step) * lot_step
+        notional = current_price * final_quantity
+        if notional < MIN_USDT:
+            additional_qty = math.ceil(((MIN_USDT / current_price) - final_quantity) / lot_step) * lot_step
+            final_quantity += additional_qty
+    if TEST_MODE:
+        print_info(f"TEST MODE: Simulated {decision.upper()} order on {symbol}: {final_quantity} units at {current_price} USDT.")
+        return {"id": f"test_{decision.lower()}", "symbol": symbol, "quantity": final_quantity}
     try:
         if decision.upper() == "BUY":
             order = exchange_futures.create_market_buy_order(symbol, final_quantity, params={"reduceOnly": False})
@@ -355,37 +415,17 @@ def execute_order(symbol: str, decision: str, final_quantity: float, current_pri
 ##############################################
 #        ENSEMBLE MODEL INTEGRATION          #
 ##############################################
-# Load the ensemble models (YDF and TensorFlow) once at startup.
 try:
-    ydf_model = load_ydf_model()  # Function from ensemble_models.py
-    tf_model = load_tf_model()    # Function from ensemble_models.py
+    ydf_model = load_ydf_model("model_rf.ydf")
+    tf_model = load_tf_model("nn_model.h5")
     print_info("Ensemble models loaded successfully.")
 except Exception as e:
     print_error(f"Error loading ensemble models: {e}")
     sys.exit(1)
 
-def get_ensemble_decision(features: Dict[str, Any]) -> str:
-    """
-    Given a feature dictionary, return the ensemble prediction.
-    The ensemble_predict() function should combine predictions from both the YDF and TensorFlow models.
-    """
-    try:
-        decision = ensemble_predict(ydf_model, tf_model, features)
-        decision = decision.upper()
-        if decision not in ["BUY", "SELL", "HOLD"]:
-            decision = "HOLD"
-        return decision
-    except Exception as e:
-        print_error(f"Error during ensemble prediction: {e}")
-        return "HOLD"
-
-##############################################
-#        MODEL PREDICTION (Fallback)         #
-##############################################
 def predict_decision(symbol: str, current_price: float, moving_average: float,
                      rsi: Optional[float], macd: Optional[float],
                      signal_line: Optional[float], bbands: Tuple[Optional[float], Optional[float], Optional[float]]) -> str:
-    # Build feature dictionary
     lower_bb, sma_bb, upper_bb = bbands if bbands is not None else (0.0, 0.0, 0.0)
     lower_bb = 0.0 if lower_bb is None else lower_bb
     sma_bb = 0.0 if sma_bb is None else sma_bb
@@ -400,23 +440,19 @@ def predict_decision(symbol: str, current_price: float, moving_average: float,
         "lower_bb": lower_bb,
         "sma_bb": sma_bb,
         "upper_bb": upper_bb,
-        # Additional engineered features could be added here:
-        "vol_adjusted_price": 0.0,
-        "volume_ma": 0.0,
+        "social_feature": 0.0,
         "adx": 0.0,
         "atr": 0.0,
+        "volume": 0.0,
         "order_book_depth": 0.0,
         "news_sentiment": 0.0,
-        "social_feature": 0.0
+        "vol_adjusted_price": 0.0,
+        "volume_ma": 0.0
     }
     debug_log(f"Features for {symbol}: {features}")
-    
-    # Use ensemble prediction first
-    ensemble_decision = get_ensemble_decision(features)
+    ensemble_decision = get_ensemble_decision(features, ydf_model, tf_model)
     if ensemble_decision != "HOLD":
         return ensemble_decision
-    
-    # Fallback: use rule-based decision using RSI thresholds
     if rsi is not None:
         if rsi < 40:
             return "BUY"
@@ -429,7 +465,7 @@ def predict_decision(symbol: str, current_price: float, moving_average: float,
 ##############################################
 historical_prices: Dict[str, List[float]] = {}
 WINDOW_SIZE = 50
-COOLDOWN = 0.2  # Reduced cooldown for more trades.
+COOLDOWN = 0.2
 SLEEP_INTERVAL = 0.1
 
 def get_latest_price(symbol: str) -> Optional[float]:
@@ -473,7 +509,7 @@ def trading_logic(symbol: str, last_trade_time: Dict[str, float]) -> Dict[str, f
             return last_trade_time
 
         final_quantity = adjust_quantity(symbol, decision, base_qty, current_price)
-        if final_quantity is None:
+        if final_quantity is None or final_quantity <= 0:
             print_info(f"Final quantity is 0 for {symbol} {decision}. No trade executed.")
             return last_trade_time
 
@@ -568,7 +604,7 @@ def handle_profit(message: types.Message) -> None:
 def shutdown_bot() -> None:
     print_info("Shutting down bot and closing all positions...")
     try:
-        close_position()  # Placeholder: implement your close_position logic as needed.
+        close_position()  # Implement your close_position logic as needed.
     except Exception as e:
         print_error(f"Error closing positions during shutdown: {e}")
     telegram_notify("Bot is shutting down. All open positions are closed.")
