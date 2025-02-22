@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """
-Enhanced Trading Model Ensemble using Yggdrasil Decision Forests (YDF), TensorFlow, and DeepSeek‑Qwen‑1.5B for decision support.
+Enhanced Trading Model Ensemble with DeepSeek Integration.
 
-This script loads trade data from an Excel file, applies feature engineering, and trains:
-    • a YDF Random Forest model, and
-    • a TensorFlow neural network for multi-class classification.
-Their predictions are ensembled via stacking, and additional decision support is provided via the DeepSeek‑Qwen‑1.5B model.
+This script trains a Random Forest (via TensorFlow Decision Forests), a Neural Network,
+and integrates a pre-trained DeepSeek model for trading decisions.
 """
 
 import os
@@ -13,130 +11,117 @@ import time
 import logging
 import numpy as np
 import pandas as pd
-import torch
 import tensorflow as tf
 from tensorflow.keras.utils import to_categorical
+from typing import Optional, Tuple
+import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-import ydf  # Ensure YDF is installed (e.g., pip install ydf -U)
 
-# Global indicator parameters
-INDICATOR_PARAMS = {
-    'rsi_buy_threshold': 30,
-    'rsi_sell_threshold': 70,
-    'adx_threshold': 25,
-    'atr_multiplier': 1.5
-}
+# Set up logging
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+debug_log = logging.debug
 
-# List of features expected by the ensemble (and used for training)
+# Global parameters
+INDICATOR_PARAMS = {'atr_multiplier': 1.5, 'sma_period': 20, 'rsi_period': 14, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'bb_period': 20, 'bb_std': 2}
+
+# Required features with underscores (consistent with TFDF naming)
 REQUIRED_FEATURES = [
-    'price', 'sma', 'rsi', 'macd', 'signal_line',
-    'lower_bb', 'sma_bb', 'upper_bb', 'social_feature',
-    'adx', 'atr', 'volume', 'order_book_depth',
-    'news_sentiment', 'vol_adjusted_price', 'volume_ma'
+    'price', 'Order_Amount', 'sma', 'Filled', 'Total', 'future_price', 'atr', 'vol_adjusted_price',
+    'volume_ma', 'macd', 'signal_line', 'lower_bb', 'sma_bb', 'upper_bb', 'news_sentiment',
+    'social_feature', 'adx', 'rsi', 'order_book_depth', 'volume'
 ]
 
-# Global ensemble model dictionary
+# Global dictionary for ensemble models
 ensemble_model_dict = {}
 
-# ---------------------------
-# Secrets Handling
-# ---------------------------
-def get_huggingface_token(secrets_file="secrets.txt"):
-    token = None
-    if os.path.exists(secrets_file):
-        with open(secrets_file, "r") as f:
-            for line in f:
-                if line.startswith("HUGGINGFACE_TOKEN="):
-                    token = line.strip().split("=", 1)[1]
-                    break
-    if not token:
-        logging.warning("No Hugging Face token found in %s", secrets_file)
-    else:
-        logging.info("Hugging Face token loaded from %s", secrets_file)
-    return token
+### Data Loading and Feature Engineering ###
 
-# ---------------------------
-# Data Loading and Processing
-# ---------------------------
+def calculate_sma(series: pd.Series, period: int) -> pd.Series:
+    return series.rolling(window=period, min_periods=1).mean()
+
+def calculate_rsi(series: pd.Series, period: int) -> pd.Series:
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period, min_periods=1).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period, min_periods=1).mean()
+    rs = gain / loss.replace(0, np.nan)
+    return 100 - (100 / (1 + rs)).fillna(100)
+
+def calculate_macd(series: pd.Series, fast: int, slow: int, signal: int) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    ema_fast = series.ewm(span=fast, adjust=False).mean()
+    ema_slow = series.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    return macd_line, signal_line, macd_line - signal_line
+
+def calculate_bbands(series: pd.Series, period: int, num_std: int) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    sma = series.rolling(window=period, min_periods=1).mean()
+    std = series.rolling(window=period, min_periods=1).std().fillna(0)
+    return sma - num_std * std, sma, sma + num_std * std
+
 def load_trade_data(filepath: str) -> pd.DataFrame:
-    logging.info("Loading trade data from %s...", filepath)
+    logging.info(f"Loading trade data from {filepath}...")
     df = pd.read_excel(filepath)
-    
-    # Map columns if necessary
-    column_map = {'Order Price': 'price', 'AvgTrading Price': 'sma'}
-    logging.info("Mapping columns: %s", column_map)
-    df.rename(columns=column_map, inplace=True)
-    
-    # Drop non-numeric columns that are not needed
-    drop_cols = ['Date(UTC)', 'clientOrderId', 'Pair', 'Type', 'status', 'Strategy Id', 'Strategy Type', 'orderId']
-    for col in drop_cols:
+    mapping = {'Order Price': 'price', 'AvgTrading Price': 'sma', 'Order Amount': 'Order_Amount'}
+    df = df.rename(columns=mapping)
+    non_numeric = ['Date(UTC)', 'orderId', 'clientOrderId', 'Pair', 'Type', 'status', 'Strategy Id', 'Strategy Type']
+    for col in non_numeric:
         if col in df.columns:
-            logging.info("Dropping column: %s", col)
-            df.drop(columns=[col], inplace=True)
-    
-    # Ensure required numeric columns are present; add missing ones with default 0.0
-    required_numeric = {'adx', 'social_feature', 'upper_bb', 'order_book_depth', 'volume',
-                        'rsi', 'atr', 'lower_bb', 'volume_ma', 'sma_bb', 'news_sentiment', 'macd', 'signal_line', 'vol_adjusted_price'}
-    missing_cols = required_numeric - set(df.columns)
-    if missing_cols:
-        logging.info("Adding missing columns with default value 0.0: %s", missing_cols)
-        for col in missing_cols:
-            df[col] = 0.0
-
-    # Generate synthetic target labels if not present
+            logging.info(f"Dropping non-numeric column: {col}")
+            df = df.drop(columns=[col])
     if 'target' not in df.columns:
-        logging.info("No 'target' column found in trade data. Generating synthetic target labels.")
-        try:
-            df['price'] = pd.to_numeric(df['price'], errors='coerce')
-            noise = np.random.uniform(-0.05, 0.05, len(df))
-            df.loc[:, 'future_price'] = df['price'] * (1 + noise)
-            df.loc[:, 'predicted_return'] = ((df['future_price'] - df['price']) / df['price']) * 100
-            def label_target(row):
-                return 1 if row['predicted_return'] > 0 else (2 if row['predicted_return'] < 0 else 0)
-            df.loc[:, 'target'] = df.apply(label_target, axis=1).astype(str)
-        except Exception as e:
-            logging.error("Error generating synthetic target: %s", e)
-            raise e
-
+        logging.warning(f"No 'target' column found in {filepath}. Generating synthetic labels for testing purposes.")
+        df['target'] = np.random.choice([0, 1, 2], size=len(df))  # 0 = HOLD, 1 = BUY, 2 = SELL
     return df
 
 def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     logging.info("Performing feature engineering...")
-    df['price'] = pd.to_numeric(df['price'], errors='coerce')
-    df['atr'] = pd.to_numeric(df['atr'], errors='coerce')
-    df.loc[:, 'vol_adjusted_price'] = df['price'] / (df['atr'] * INDICATOR_PARAMS['atr_multiplier'] + 1)
-    df.loc[:, 'volume_ma'] = df['volume'].rolling(window=10, min_periods=1).mean()
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+    
+    df['sma'] = calculate_sma(df['price'], INDICATOR_PARAMS['sma_period'])
+    df['rsi'] = calculate_rsi(df['price'], INDICATOR_PARAMS['rsi_period'])
+    df['macd'], df['signal_line'], _ = calculate_macd(df['price'], INDICATOR_PARAMS['macd_fast'], INDICATOR_PARAMS['macd_slow'], INDICATOR_PARAMS['macd_signal'])
+    df['lower_bb'], df['sma_bb'], df['upper_bb'] = calculate_bbands(df['price'], INDICATOR_PARAMS['bb_period'], INDICATOR_PARAMS['bb_std'])
+    df['vol_adjusted_price'] = df['price'] / (df.get('atr', 0.0) * INDICATOR_PARAMS['atr_multiplier'] + 1)
+    df['volume_ma'] = calculate_sma(df.get('volume', pd.Series(0, index=df.index)), INDICATOR_PARAMS['sma_period'])
+    
+    for col in REQUIRED_FEATURES:
+        if col not in df.columns:
+            df[col] = 0.0
     logging.info("Feature engineering completed.")
     return df
 
-def split_dataset(df: pd.DataFrame, train_ratio: float = 0.8):
+def split_dataset(df: pd.DataFrame, train_ratio: float = 0.8) -> Tuple[pd.DataFrame, pd.DataFrame]:
     logging.info("Splitting dataset into training and test sets...")
-    shuffled_df = df.sample(frac=1, random_state=42)
-    train_size = int(train_ratio * len(df))
-    train_df = shuffled_df.iloc[:train_size].reset_index(drop=True)
-    test_df = shuffled_df.iloc[train_size:].reset_index(drop=True)
-    logging.info("Training set shape: %s; Test set shape: %s", train_df.shape, test_df.shape)
-    return train_df, test_df
+    df_shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
+    split_index = int(train_ratio * len(df_shuffled))
+    return df_shuffled.iloc[:split_index], df_shuffled.iloc[split_index:]
 
-def prepare_tf_dataset(df: pd.DataFrame, feature_cols: list, batch_size: int = 100):
-    X = df[feature_cols].copy().apply(pd.to_numeric, errors='coerce').fillna(0.0)
+### Model Training Functions ###
+
+def train_random_forest(train_df: pd.DataFrame, learner_params: dict) -> 'tfdf.keras.RandomForestModel':
+    logging.info("Training Random Forest model using TensorFlow Decision Forests...")
+    import tensorflow_decision_forests as tfdf
+    model = tfdf.keras.RandomForestModel(
+        num_trees=learner_params["num_trees"],
+        max_depth=learner_params["max_depth"],
+        random_seed=learner_params["random_seed"],
+        task=tfdf.keras.Task.CLASSIFICATION
+    )
+    tf_train_ds = tfdf.keras.pd_dataframe_to_tf_dataset(train_df[REQUIRED_FEATURES + ['target']], label="target")
+    start_time = time.time()
+    model.fit(tf_train_ds)
+    elapsed_time = time.time() - start_time
+    logging.info(f"TFDF training completed in {elapsed_time:.2f} seconds.")
+    model.save("model_rf.ydf")
+    return model
+
+def prepare_tf_dataset(df: pd.DataFrame, feature_cols: list, batch_size: int = 100) -> tf.data.Dataset:
+    X = df[feature_cols].copy()
     y = df['target'].astype(int).values
     y_onehot = to_categorical(y, num_classes=3)
     dataset = tf.data.Dataset.from_tensor_slices((X.values.astype('float32'), y_onehot))
-    dataset = dataset.shuffle(buffer_size=len(X), seed=42).batch(batch_size)
-    return dataset
-
-# ---------------------------
-# Model Training Functions
-# ---------------------------
-def train_random_forest(train_df: pd.DataFrame, learner_params: dict) -> any:
-    logging.info("Training YDF Random Forest model...")
-    learner = ydf.RandomForestLearner(label="target", **learner_params)
-    start_time = time.time()
-    model = learner.train(train_df)
-    elapsed_time = time.time() - start_time
-    logging.info("YDF training completed in %.2f seconds.", elapsed_time)
-    return model
+    return dataset.shuffle(buffer_size=len(X), seed=42).batch(batch_size)
 
 def build_nn_model(input_dim: int) -> tf.keras.Model:
     inputs = tf.keras.Input(shape=(input_dim,), name="features")
@@ -151,147 +136,107 @@ def train_neural_network(tf_train_ds, tf_val_ds, input_dim: int, epochs: int = 5
     logging.info("Training TensorFlow neural network model...")
     model = build_nn_model(input_dim)
     model.fit(tf_train_ds, validation_data=tf_val_ds, epochs=epochs, verbose=1)
+    model.save("nn_model.h5")
     return model
 
-# ---------------------------
-# DeepSeek‑Qwen‑1.5B Model Integration
-# ---------------------------
-def load_deepseek_model(model_path: str = "./DeepSeek-R1-Distill-Qwen-1.5B"):
-    """
-    Load the DeepSeek‑Qwen‑1.5B model and its tokenizer for local inference.
-    Uses the Hugging Face token from secrets.txt if necessary.
-    """
-    token = get_huggingface_token()
-    device = torch.device("mps")
-    logging.info("Loading DeepSeek‑Qwen‑1.5B model on device: %s", device)
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False, token=token)
-        model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            torch_dtype=torch.bfloat16,
-            low_cpu_mem_usage=True,
-            token=token
-        ).to(device)
-    except Exception as e:
-        logging.error("Failed to load DeepSeek model: %s", e)
-        raise e
+### DeepSeek Model ###
+
+def load_deepseek_model(model_path: str = "./DeepSeek-R1-Distill-Qwen-1.5B", device: str = "cpu"):
+    logging.info(f"Loading DeepSeek model from {model_path} on device {device}...")
+    tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float32, low_cpu_mem_usage=True)
+    model.to(device)
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
     return tokenizer, model, device
 
-# ---------------------------
-# Ensemble and Decision Functions
-# ---------------------------
-def rule_based_signal(row: pd.Series) -> str:
-    if row['rsi'] < INDICATOR_PARAMS['rsi_buy_threshold'] and row['adx'] > INDICATOR_PARAMS['adx_threshold']:
-        return "BUY"
-    elif row['rsi'] > INDICATOR_PARAMS['rsi_sell_threshold'] and row['adx'] > INDICATOR_PARAMS['adx_threshold']:
-        return "SELL"
-    else:
-        return "HOLD"
+def deepseek_generate(tokenizer, model, prompt: str, device: str = "cpu", max_new_tokens: int = 32) -> str:
+    try:
+        inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
+        input_ids = inputs["input_ids"].to(device)
+        attention_mask = inputs["attention_mask"].to(device)
+        outputs = model.generate(
+            input_ids,
+            attention_mask=attention_mask,
+            max_new_tokens=max_new_tokens,
+            temperature=1.0,
+            pad_token_id=tokenizer.pad_token_id,
+            do_sample=True
+        )
+        return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    except Exception as e:
+        logging.error(f"DeepSeek generation failed: {e}")
+        return "HOLD"  # Fallback to HOLD if generation fails
 
-def ensemble_signal(ydf_pred: np.ndarray, nn_pred: np.ndarray) -> str:
-    avg_prob = (ydf_pred + nn_pred) / 2.0
-    pred_class = np.argmax(avg_prob)
-    return {0: "HOLD", 1: "BUY", 2: "SELL"}.get(pred_class, "HOLD")
+### Ensemble Decision ###
 
 def get_ensemble_decision(features: dict) -> str:
-    global ensemble_model_dict
-    # Build input array from REQUIRED_FEATURES in fixed order
-    input_array = np.array([[features[col] for col in REQUIRED_FEATURES]], dtype='float32')
-    # Build input dictionary for YDF using the same fixed order
-    ydf_input = {col: input_array[:, i:i+1] for i, col in enumerate(REQUIRED_FEATURES)}
-    ydf_probs = ensemble_model_dict['ydf'](ydf_input).numpy()[0]
-    nn_probs = ensemble_model_dict['nn'](input_array).numpy()[0]
-    return ensemble_signal(ydf_probs, nn_probs)
+    # Prepare input for YDF with consistent feature names
+    ydf_input = {key: tf.convert_to_tensor([features.get(key, 0.0)], dtype=tf.float32) for key in REQUIRED_FEATURES}
+    ydf_probs = ensemble_model_dict['ydf'](ydf_input)[0]  # YDF predict returns NumPy array directly
+    
+    # Prepare input for NN (flat array)
+    nn_input = np.array([[features.get(col, 0.0) for col in REQUIRED_FEATURES]], dtype='float32')
+    nn_probs = ensemble_model_dict['nn'](nn_input).numpy()[0]
+    
+    # DeepSeek prediction
+    prompt = ("Based on the following market features: " +
+              ", ".join(f"{k}: {v}" for k, v in features.items()) +
+              ". What is the recommended trading action? Answer BUY, SELL, or HOLD.")
+    ds_output = deepseek_generate(ensemble_model_dict['ds_tokenizer'], ensemble_model_dict['ds_model'], prompt, ensemble_model_dict['ds_device'])
+    logging.info(f"DeepSeek output: {ds_output}")
+    ds_decision = "HOLD"
+    if "BUY" in ds_output.upper():
+        ds_decision = "BUY"
+    elif "SELL" in ds_output.upper():
+        ds_decision = "SELL"
+    ds_probs = {"BUY": [0, 1, 0], "SELL": [0, 0, 1], "HOLD": [1, 0, 0]}[ds_decision]
+    
+    # Average probabilities
+    avg_probs = (ydf_probs + nn_probs + np.array(ds_probs)) / 3.0
+    return {0: "HOLD", 1: "BUY", 2: "SELL"}[np.argmax(avg_probs)]
 
-def predict_decision(symbol: str, current_price: float, moving_average: float,
-                     rsi: float, macd: float, signal_line: float,
-                     bbands: tuple) -> str:
-    lower_bb, sma_bb, upper_bb = bbands
-    features = {
-        "price": current_price,
-        "sma": moving_average,
-        "rsi": rsi,
-        "macd": macd,
-        "signal_line": signal_line,
-        "lower_bb": lower_bb,
-        "sma_bb": sma_bb,
-        "upper_bb": upper_bb,
-        "volume": 0.0,
-        "social_feature": 0.0,
-        "adx": 0.0,
-        "atr": 0.0,
-        "order_book_depth": 0.0,
-        "news_sentiment": 0.0,
-        "vol_adjusted_price": 0.0,
-        "volume_ma": 0.0
-    }
-    ensemble_decision = get_ensemble_decision(features)
-    if ensemble_decision != "HOLD":
-        return ensemble_decision
-    if rsi < 40:
-        return "BUY"
-    elif rsi > 60:
-        return "SELL"
-    return "HOLD"
+def simulate_trading(ensemble_model: dict, test_df: pd.DataFrame, feature_cols: list):
+    logging.info("Simulating trading...")
+    test_df = test_df.rename(columns={'Order Amount': 'Order_Amount'})
+    for idx in range(min(10, len(test_df))):
+        row = test_df.iloc[idx]
+        features = {col: row.get(col, 0.0) for col in REQUIRED_FEATURES}
+        decision = get_ensemble_decision(features)
+        logging.info(f"Example {idx}: Features: {features} -> Decision: {decision}")
+        execute_trade(decision, order_value=100, current_price=features["price"], symbol="BTC/USDT")
 
-# ---------------------------
-# Main Pipeline
-# ---------------------------
+def execute_trade(signal: str, order_value: float, current_price: float, symbol: str):
+    logging.info(f"Executing {signal} order for {symbol} with value {order_value} USDT at price {current_price}")
+
+### Main Pipeline ###
+
 def main():
-    # Load and process trade data
     df_trade = load_trade_data("export_trades.xlsx")
     df_trade = feature_engineering(df_trade)
-    feature_cols = [col for col in df_trade.columns if col != 'target']
+    feature_cols = REQUIRED_FEATURES
     train_df, test_df = split_dataset(df_trade)
 
-    # Train YDF model
-    ydf_learner_params = {"num_trees": 800, "max_depth": 30, "random_seed": 42}
+    ydf_learner_params = {"num_trees": 500, "max_depth": 20, "random_seed": 42}
     ydf_model = train_random_forest(train_df, ydf_learner_params)
-    ydf_tf = ydf_model.to_tensorflow_function()
+    ydf_tf = lambda x: ydf_model.predict(x)
 
-    # Prepare TensorFlow datasets for NN training
     split_index = int(0.9 * len(train_df))
     tf_train_df = train_df.iloc[:split_index].reset_index(drop=True)
     tf_val_df = train_df.iloc[split_index:].reset_index(drop=True)
-    tf_train_ds = prepare_tf_dataset(tf_train_df, feature_cols, batch_size=100)
-    tf_val_ds = prepare_tf_dataset(tf_val_df, feature_cols, batch_size=100)
+    tf_train_ds = prepare_tf_dataset(tf_train_df, feature_cols)
+    tf_val_ds = prepare_tf_dataset(tf_val_df, feature_cols)
+    nn_model = train_neural_network(tf_train_ds, tf_val_ds, len(feature_cols))
 
-    # Train NN model
-    input_dim = len(feature_cols)
-    nn_model = train_neural_network(tf_train_ds, tf_val_ds, input_dim, epochs=5)
+    ds_tokenizer, ds_model, ds_device = load_deepseek_model()
 
-    # Build ensemble dictionary using REQUIRED_FEATURES order.
-    # NOTE: We now directly pass the input dictionary to ydf_tf.
-    global ensemble_model_dict
-    ensemble_model_dict = {
-        'ydf': lambda x: ydf_tf(x),
-        'nn': lambda x: nn_model(x)
-    }
+    ensemble_model_dict['ydf'] = ydf_tf
+    ensemble_model_dict['nn'] = nn_model
+    ensemble_model_dict['ds_tokenizer'] = ds_tokenizer
+    ensemble_model_dict['ds_model'] = ds_model
+    ensemble_model_dict['ds_device'] = ds_device
 
-    # Simulate trading using ensemble predictions (example)
-    logging.info("Simulating trading using ensemble predictions...")
-    for idx in range(10):
-        row = test_df.iloc[idx]
-        features = {col: row[col] for col in REQUIRED_FEATURES}
-        decision = get_ensemble_decision(features)
-        logging.info("Example %d: Ensemble decision = %s", idx, decision)
-
-    # Load the DeepSeek‑Qwen‑1.5B model for decision support
-    try:
-        ds_tokenizer, ds_model, ds_device = load_deepseek_model()
-        prompt = "Based on current market data, what is the recommended trading decision?"
-        input_ids = ds_tokenizer(prompt, return_tensors="pt").input_ids.to(ds_device)
-        output = ds_model.generate(input_ids, max_new_tokens=50)
-        response = ds_tokenizer.decode(output[0], skip_special_tokens=True)
-        logging.info("DeepSeek model response: %s", response)
-    except Exception as e:
-        logging.error("DeepSeek model integration failed: %s", e)
-
-    # Save models if needed
-    ydf_model.save("model_rf.ydf")
-    nn_model.save("nn_model.keras")
-    logging.info("Models saved successfully.")
+    simulate_trading(ensemble_model_dict, test_df, feature_cols)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     main()
