@@ -229,17 +229,18 @@ def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
     # Get the latest evaluation time from the test set up to test_fold_end
     last_test_eval_time = cv.eval_times.iloc[test_indices[test_indices <= test_fold_end]].max()
     
-    # Ensure last_test_eval_time is a Timestamp (if it’s an int, assume it’s a Unix timestamp in milliseconds)
+    # Ensure last_test_eval_time is a Timestamp
     if isinstance(last_test_eval_time, (int, np.integer)):
-        last_test_eval_time = pd.Timestamp.fromtimestamp(last_test_eval_time / 1000)  # Convert ms to seconds
+        last_test_eval_time = pd.Timestamp.fromtimestamp(last_test_eval_time / 1000)  # Convert ms Unix timestamp to seconds
     elif not isinstance(last_test_eval_time, pd.Timestamp):
         last_test_eval_time = pd.Timestamp(last_test_eval_time)
 
-    # Compute the embargo cutoff time
+    # Compute embargo cutoff time
     embargo_cutoff = last_test_eval_time + cv.embargo_td
     
-    # Filter pred_times to exclude those within the embargo period
-    min_train_index = len(cv.pred_times[cv.pred_times <= embargo_cutoff])
+    # Compare timestamps correctly (cv.pred_times is a Series of Timestamps)
+    embargo_mask = cv.pred_times <= embargo_cutoff  # Returns a boolean Series
+    min_train_index = embargo_mask.sum()  # Number of True values (length of times <= cutoff)
     
     if min_train_index < cv.indices.shape[0]:
         allowed_indices = np.concatenate((cv.indices[:test_fold_end], cv.indices[min_train_index:]))

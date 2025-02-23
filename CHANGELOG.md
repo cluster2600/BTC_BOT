@@ -7,3 +7,4 @@
 - Installed necessary dependencies: `transformers`, `openpyxl`, `tensorflow_decision_forests`, and `accelerate`.
 - Trained a Random Forest model using TensorFlow Decision Forests.
 - Simulated trading using the DeepSeek model.
+- Created `training.py` to launch all model training processes at once.

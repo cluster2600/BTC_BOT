@@ -3,3 +3,7 @@ secrets.txt
 apikeys.txt
 secrets.txt
 DeepSeek-R1-Distill-Qwen-1.5B/
+venv310/
+.DS_Store # macOS junk file
+data/5m_25000/ # Optional: exclude data folder if large
+train_results/ # Optional: exclude results if large

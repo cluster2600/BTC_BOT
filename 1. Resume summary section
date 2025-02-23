@@ -1,0 +1,660 @@
+1. Resume summary section
+
+"Create a compelling summary section for my resume that encapsulates my professional experience, key skills, and achievements, tailored to a [job position] role at [company] in the [industry] sector, while reflecting the [company culture/value]."
+
+2. Customizing for ATS
+
+"Rewrite my resume with keyword optimization to ensure it passes through Applicant Tracking Systems (ATS) for a [job position] at [company], aligning with the [key competencies/skills] mentioned in the job description."
+
+3. Cover letter integration
+
+"Integrate key points from my resume into a cover letter paragraph that highlights my unique qualifications for the [job position] at [company], emphasizing my [specific skill/experience] that aligns with [company's mission/vision]."
+
+4. Language skills enhancement
+ 
+"Highlight my multilingual abilities in the resume, detailing proficiency levels and how these skills align with [global/market needs] at [company] in the [job position]. Include examples of relevant applications of these skills."
+
+5. Technical skills section
+
+"Detail the technical skills, software proficiencies, and certifications that make me a strong candidate for the [job position] at [company]. Tailor the list to focus on tools and technologies emphasized in [industry/role-specific needs]."
+
+6. Soft skills demonstration
+
+"Craft impactful examples of how my soft skills, such as [communication, leadership, or teamwork], have driven positive outcomes, tailored for enhancing the soft skills section of my resume for a [job position] at [company]."
+
+7. Customizable resume template creation
+
+"Design a versatile and modern resume template that can be easily customized for different applications, including placeholders for [job position], [company], [industry], and [achievements/metrics]. Ensure it reflects current resume design trends."
+
+8. Feedback and revision suggestions
+
+"Provide actionable feedback for revising my current resume to better align with a [job position] at [company]. Focus on improving [layout, language, and relevance to the role] while ensuring clarity and professionalism."
+
+
+here is the ad:
+About the job
+Debiopharm is privately-owned Swiss biopharmaceutical company commitmented to research in oncology and infectious diseases in order to improve patient outcomes and quality of life. Debiopharm International SA aims to develop innovative therapies via our unique "development only" business model, acting as a bridge between disruptive discovery products and patient access in international markets. At Debiopharm you will be at the forefront of the fight against cancer and infectious diseases through working on innovative medicines for patients. Join our team at Debiopharm where together, we innovate, we impact, and we grow.
+For our IT organization based at our Headquarters in Lausanne, we are looking for a
+IT & Infrastructure Lead
+You ensure the integrity, availability, and performance of our information systems. This role is a blend of hands-on technical expertise and leadership, overseeing IT infrastructure, security, and user support while driving key IT projects.
+If you have strong technical skills in VMware, Windows, Linux, networking, and a first experience in team management, this is the opportunity to make a real impact in a dynamic and innovative environment!
+Your responsibilities will be but not limited to:
+Lead our IT & Infrastructure team, fostering collaboration and efficiency
+Oversee the installation, maintenance, and qualification of IT systems, ensuring smooth daily operations
+Provide end-to-end support (L1 to L3), troubleshooting issues and ensuring optimal performance of user workstations and IT services
+Manage and secure network infrastructures, including interconnections with external partners and group sites
+Enforce and update IT security protocols and quality standards, ensuring compliance with best practices
+Lead and deliver strategic IT infrastructure projects that align with business objectives
+
+Requirements
+
+Expertise in VMware, Windows Servers, Active Directory, and Linux (Oracle/Debian). Experience with SQL databases and network equipment (routers, switches, firewalls)
+Proficiency in scripting (Bash/Shell, PowerShell, Python) and system analysis tools
+Solid knowledge of IT security best practices and the ability to create clear technical documentation
+Strong problem-solving and communication skills, with a proactive and service-oriented mindset
+Ability to handle high-pressure IT emergencies efficiently
+Previous experience in coaching & mentoring, with the willingness to evolve as people manager
+Strong communication skill in both English (C1) and French (C1) required
+This position is 100% based in our office in Lausanne
+
+Benefits
+
+International, highly dynamic environment with a long term vision
+Cross-functional collaboration at the forefront of the most advanced scientific developments in oncology and anti-bacterial industry
+Exposure to a wide variety of areas and functions within clinical development and the pharmaceutical industry
+Participation in a company where innovation, people and entrepreneurship are the fundamental keys to success
+Proud to be an Equal-Pay certified, we ensure offering to all our employees the same opportunities 
+The use of external staffing agencies or recruiters requires prior approval from our Human Resources Department. The Human Resources Department at Debiopharm requests external staffing agencies or recruiters not to contact Debiopharm employees or members of the Board of Directors directly in an attempt to present candidates.
+Submission of unsolicited resumes in advance of an agreement between the Human Resources Department and the external staffing agency or recruiter does not create any implied obligation on the part of Debiopharm.
+Debiopharm will not accept unsolicited resumes from any source other than candidates themselves for either current or future positions.
+
+Here is my CV:
+\documentclass[10pt,a4paper,sans]{moderncv}
+
+% ===============================
+% Thème et Style
+% ===============================
+\moderncvstyle{classic}
+\moderncvcolor{blue}
+
+% ===============================
+% Packages additionnels
+% ===============================
+\usepackage{fontspec}
+\usepackage{geometry}
+\usepackage[french]{babel}
+%\usepackage{hyperref} % Supprimé car déjà chargé par moderncv
+\usepackage{adjustbox} % Pour ajuster la taille du cadre
+
+% ===============================
+% Configuration des Marges
+% ===============================
+\geometry{
+    left=1.5cm,
+    right=1.5cm,
+    top=1.5cm,
+    bottom=1.5cm
+}
+
+% ===============================
+% Informations Personnelles
+% ===============================
+\name{Maxime}{Grenu}
+\title{Responsable des Systèmes d'Information}
+\address{Rue du Midi 1}{1800 Vevey}{Suisse}
+\phone[mobile]{+41~78~704~30~68}
+\email{maxime.grenu@gmail.com}
+\social[linkedin]{maximegrenus}
+\photo[64pt][0.4pt]{Maxime.jpeg} % Assurez-vous que le fichier Maxime.jpeg est présent
+
+% ===============================
+% Début du Document
+% ===============================
+\begin{document}
+\makecvtitle
+
+% ===============================
+% Profil
+% ===============================
+\section{Profil}
+\cvitem{}{
+Responsable des Systèmes d'Information avec plus de 25 ans d'expérience dans le domaine de l'ingénierie DevOps et la gestion des infrastructures informatiques. Expert en conception et mise en œuvre d'infrastructures complexes, gestion de projets de transformation digitale, cybersécurité et services cloud (AWS, Azure). Doté d'un excellent leadership et capable de fédérer des équipes multidisciplinaires pour atteindre des objectifs communs.
+}
+
+% ===============================
+% Expérience Professionnelle
+% ===============================
+\section{Expérience Professionnelle}
+
+\cventry{Juin 2023 -- Juin 2024}{Head of DevOps Engineering}{FlowBank}{Genève, Suisse}{}{%
+\begin{itemize}%
+\item En tant que Head of DevOps et Infrastructure chez FlowBank, j'ai dirigé des initiatives clés en tirant parti de plus de 20 ans d'expertise en informatique et en gestion de projets.
+\item J'ai construit une équipe DevOps performante et mis en place le premier campus Wi-Fi 7 de Suisse.
+\item Mon expertise en VMware, ITIL V3, Six Sigma et méthodologies Agile a assuré une infrastructure résiliente et des opérations efficaces.
+\item Mise en œuvre réussie des services cloud AWS et des microservices Kubernetes, transformant l'infrastructure de FlowBank pour qu'elle soit plus évolutive et fiable.
+\item Introduction de Teleport pour un accès sécurisé à l'infrastructure et de ServiceNow pour un CMDB automatisé, rationalisant les opérations et améliorant la gestion des services IT.
+\item Initiatives de réduction des coûts en passant de Cisco à Huawei pour le réseau et en migrant les bases de données de MS SQL vers PostgreSQL, réduisant considérablement les coûts tout en maintenant les performances du système.
+\item Malgré ces succès, FlowBank a fait face à des difficultés financières, conduisant la FINMA à initier une procédure de faillite en juin 2024 pour non-conformité réglementaire.
+\item Mes efforts dans la modernisation de l'infrastructure et l'automatisation des processus ont été des réalisations cruciales pendant cette période difficile.
+\end{itemize}%
+}
+
+\cventry{Fév. 2022 -- Juin 2023}{Team Lead, System Administration}{SIB Swiss Institute of Bioinformatics}{Lausanne, Suisse}{}{%
+\begin{itemize}%
+\item Responsable de l'équipe SysAdmin, dirigeant des projets d'infrastructure clés et gérant les opérations de l'équipe.
+\item Recrutement, formation et répartition du travail au sein de l'équipe, assurant une collaboration efficace et la livraison des projets.
+\item Mise à niveau du nœud Lausanne BiomedIT (\href{https://www.biomedit.ch/}{www.biomedit.ch}), améliorant sa capacité à soutenir la recherche en bioinformatique.
+\item Transition du réseau du campus et du data center de HP à Huawei, améliorant les performances du réseau, l'évolutivité et réduisant les coûts.
+\item Gestion de la mise hors service du cluster HPC, après le déploiement d'un cluster plus avancé, assurant la continuité des opérations de recherche.
+\item Renforcement de l'infrastructure du SIB pour soutenir la recherche biomédicale.
+\end{itemize}%
+}
+
+
+\cventry{Juil. 2021 -- Janv. 2022}{Chef de Projet Migration}{Experis}{Morges, Suisse}{}{%
+\begin{itemize}%
+\item Gestion de plusieurs initiatives de migration IT complexes, impliquant coordination et exécution technique.
+\item Migration de locataire à locataire MS 365, assurant un transfert de données transparent et un temps d'arrêt minimal.
+\item Coordination entre Swisscom et Tata Consultancy Services pour aligner les calendriers, les exigences techniques et le dépannage.
+\item Nettoyage et migration d'Active Directory, améliorant la sécurité et simplifiant la gestion des utilisateurs et des ressources.
+\item Migration de Skype for Business vers Microsoft Teams, assurant une transition fluide pour les utilisateurs.
+\item Mise en œuvre de Hybrid Azure AD Joined, intégration transparente de l'AD sur site avec Azure AD.
+\item Migration des serveurs vers Azure, aidant à réduire les coûts d'infrastructure sur site et améliorant l'évolutivité.
+\end{itemize}%
+}
+
+\cventry{Fév. 2021 -- Avr. 2021}{Consultant Infrastructure Senior}{AiM Services}{Genève, Suisse}{}{%
+\begin{itemize}%
+\item Responsable de la création de la documentation technique et des manuels utilisateurs lors du projet de migration Windows 10 pour une grande banque à Genève.
+\item Rédaction de documentations détaillées pour guider les équipes IT dans le processus de migration.
+\item Développement de manuels conviviaux pour les employés de la banque, aidant à une transition en douceur vers le nouvel environnement Windows 10.
+\end{itemize}%
+}
+
+\cventry{Mars 2020 -- Août 2020}{Digital Operations Manager}{Ecole Hôtelière de Lausanne}{Lausanne, Suisse}{}{%
+\begin{itemize}%
+\item Gestion d'une équipe de support de 10 personnes, supervisant des domaines critiques des opérations IT.
+\item Gestion des fournisseurs et de l'architecture d'entreprise, supervision du développement des applications.
+\item Gestion des budgets pour les logiciels, le matériel, les licences et les projets IT.
+\item Gestion des ressources et de la crise COVID, assurant la continuité des activités.
+\item Chef de projet IT pour le campus de Singapour avec un budget dépassant un million CHF.
+\item Changement de fournisseur en faveur de Huawei et refonte complète de la portée et des objectifs du projet.
+\end{itemize}%
+}
+
+\cventry{Août 2017 -- Mars 2020}{Responsable de la Gestion des Changements et des Problèmes IT}{Hôpital du Valais}{Sion, Suisse}{}{%
+\begin{itemize}%
+\item Supervision des initiatives clés pour assurer des opérations IT fluides et alignées sur les normes de l'industrie.
+\item Refonte complète du processus de gestion des changements pour obtenir la certification ISO 9001, alignée sur les normes ITIL.
+\item Mise en place d'un Change Advisory Board (CAB) hebdomadaire en utilisant un module ServiceNow personnalisé.
+\item Gestion et coordination des équipes DEV, INFRA, réseau et dispositifs médicaux.
+\item Gestion de projet pour la sauvegarde et le stockage d'objets avec un budget de 1,5 million CHF.
+\item Amélioration des performances des bases de données Oracle en utilisant des méthodologies Agile.
+\end{itemize}%
+}
+
+\cventry{Janv. 2014 -- Août 2017}{Consultant}{Dimension Data}{Bruxelles, Belgique}{}{%
+\begin{itemize}%
+\item Participation à divers projets IT, fournissant une expertise en modernisation d'infrastructures, migrations et solutions de protection des données.
+\item Migration O365 pour une ONG, assurant une transition en douceur avec un minimum de perturbations.
+\item Mise à niveau et refonte de l'infrastructure VDI VMware Horizon pour une banque privée.
+\item Conception et implémentation d'une nouvelle infrastructure IT pour une division d'une banque privée.
+\item Mise en œuvre de solutions de sauvegarde pour une compagnie d'assurance-vie et un fabricant d'armes.
+\item Administration de niveau 2 des serveurs pour une association sportive internationale.
+\end{itemize}%
+}
+
+\cventry{Fév. 2012 -- Janv. 2014}{Senior Systems Engineer}{AT\&T}{Bratislava, Slovaquie}{}{%
+\begin{itemize}%
+\item Leader technique des équipes de support Windows Tier 3 et Linux Tier 3, gérant une équipe de 50 ingénieurs.
+\item Support de 40\,000 serveurs, formation technique en VMware, analyse des causes profondes et dépannage.
+\item Gestion du durcissement des serveurs basé sur les normes NSA et déploiement Citrix et RDS.
+\item Gestion des infrastructures cloud privées, planification de capacité et automatisation.
+\item Gestion de plus de 22\,000 postes de travail virtuels et 20\,000 machines virtuelles sur plus de 1\,800 hôtes ESX.
+\item Champion de la récupération après sinistre, récupération de 150\,To de données après une panne SAN.
+\item Récompensé pour la résolution de la plus grande panne IT de l'histoire d'AT\&T.
+\item Gestion d'un projet de data center de laboratoire de 1,7 million de dollars en EMEA.
+\end{itemize}%
+}
+
+\cventry{Fév. 2010 -- Fév. 2012}{Security and Infrastructure Manager}{BrightPoint}{Bratislava, Slovaquie}{}{%
+\begin{itemize}%
+\item Création et gestion du processus de conception et de la documentation pour répondre aux niveaux de sécurité spécifiés par RIM (Research In Motion).
+\item Coordination avec G4S pour mettre en œuvre des modifications dans les contrats de service liés aux services de sécurité.
+\item Gestion du personnel et de l'infrastructure IT, y compris les heures supplémentaires, les congés et les embauches.
+\item Participation aux réunions de gestion pour discuter et contribuer à la stratégie de l'entreprise.
+\item Fourniture de support VMware et Windows Server, gestion des environnements virtualisés.
+\end{itemize}%
+}
+
+\cventry{Juil. 2008 -- Janv. 2010}{Systems Administrator}{Johnson Controls}{Bratislava, Slovaquie}{}{%
+\begin{itemize}%
+\item Gestion des opérations quotidiennes du département IT pour le siège européen, servant 600 utilisateurs.
+\item Gestion du processus de sauvegarde des données, stockage des bandes de sauvegarde hors site conformément aux normes ISO 9001.
+\item Administration du réseau LAN/WLAN, configurations, connectivité et dépannage.
+\item Support VMware et Windows Server 2008, gestion des machines virtuelles et du SAN.
+\item Gestion des contrats liés aux achats IT, optimisation des coûts.
+\item Conduite de simulations de récupération après sinistre pour le data center local.
+\item Coordination du projet d'expansion du siège, y compris l'installation de câblage, d'électricité, d'une nouvelle salle serveurs et d'un nouveau système PBX.
+\end{itemize}%
+}
+
+\cventry{Mars 2005 -- Juin 2008}{Systems Engineer}{Hewlett-Packard}{Bratislava, Slovaquie}{}{%
+\begin{itemize}%
+\item Support aux clients internes de HP, gestion de 5\,000 serveurs à travers plusieurs data centers.
+\item Résolution d'incidents et gestion des appels de service escaladés depuis le support de première ligne.
+\item Patching mensuel des serveurs via SMS 2003, administration à distance via Terminal Services et PC Duo.
+\item Application des principes ITIL, principalement la gestion des incidents.
+\item Gestion d'Active Directory, DHCP et DNS.
+\item Migration P2V de plusieurs centaines de serveurs physiques vers le cloud privé VMware de HP.
+\item Résolution de problèmes liés au clustering MS, en particulier avec les clusters de fichiers et d'impression.
+\end{itemize}%
+}
+
+\cventry{Mai 2003 -- Janv. 2005}{Administrateur Systèmes}{Quadria}{France}{}{%
+\begin{itemize}%
+\item Chef d'équipe support technique chez Veolia (siège mondial, Paris), gestion de la migration de Windows 2000 vers Windows XP pour 843 ordinateurs.
+\item Gestion de projets d'infrastructure IT, y compris l'installation de 150 postes de travail pour le Conseil Régional de Basse-Normandie.
+\item Support pour le Conseil Général de Seine-Maritime, intégration Active Directory de 25 nouveaux Macintosh.
+\item Support Citrix et VMware, maintien d'une ferme Citrix de 30 serveurs.
+\item Migration à grande échelle des systèmes NT/Novell vers Active Directory (Windows 2000) et Novell eDirectory pour 1\,800 ordinateurs.
+\item Mise à niveau des infrastructures réseau, installation de nouveaux racks, commutateurs, serveurs et Blade Centers.
+\end{itemize}%
+}
+
+\cventry{Sept. 1999 -- Oct. 2002}{Technicien Informatique}{IOR Systèmes}{France}{}{%
+\begin{itemize}%
+\item Administration complète des systèmes pour les PME, gestion des migrations de domaines Windows et création de domaines.
+\item Support Exchange 2000, fournissant un support technique pour assurer des services de messagerie fiables.
+\item Support multi-plateforme, y compris Linux, Mac OS et stations de travail SGI.
+\item Spécialiste en récupération après sinistre, planification et exécution.
+\item Déploiement et configuration de routeurs Cisco pour les clients PME.
+\item Support Novell NetWare et GroupWise.
+\item Détaché chez Merisant (anciennement Monsanto) à Paris, gestion de l'administration Windows, de Business Objects et du déploiement d'images GM.
+\end{itemize}%
+}
+
+% ===============================
+% Formation
+% ===============================
+\section{Formation}
+
+\cventry{1993 -- 1995}{BTS Technicien Supérieur de Maintenance et Services en Micro-Informatique}{CESI}{}{}{%
+\begin{itemize}%
+\item Spécialisation en maintenance des systèmes informatiques et en gestion des services IT.
+\end{itemize}%
+}
+
+% ===============================
+% Certifications
+% ===============================
+\section{Certifications}
+
+\begin{center}
+\adjustbox{max width=0.9\textwidth, center, frame}{%
+\scriptsize
+\begin{tabular}{@{}p{0.45\textwidth}@{\hspace{0.5cm}}p{0.45\textwidth}@{}}
+\textbf{Agile Explorer} (IBM, Oct 2024) & \textbf{Artificial Intelligence Fundamentals} (IBM, Oct 2024) \\
+\textbf{Cyber Threat Management} (Cisco, Oct 2024) & \textbf{Cybersecurity Fundamentals} (IBM, Oct 2024) \\
+\textbf{Endpoint Security} (Cisco, Oct 2024) & \textbf{Ethical Hacker} (Cisco, Oct 2024) \\
+\textbf{Fortinet Certified Associate in Cybersecurity} (Fortinet, Oct 2024 -- Oct 2026) & \textbf{Fortinet Certified Fundamentals in Cybersecurity} (Fortinet, Oct 2024 -- Oct 2026) \\
+\textbf{Fortinet FortiGate 7.4 Operator} (Fortinet, Oct 2024) & \textbf{Introduction to Cybersecurity} (Cisco, Oct 2024) \\
+\textbf{Junior Cybersecurity Analyst Career Path} (Cisco, Oct 2024) & \textbf{Network Defense} (Cisco, Oct 2024) \\
+\textbf{Networking Devices and Initial Configuration} (Cisco, Oct 2024) & \textbf{IBM Bluemix - Practitioner Essentials} (IBM, Nov 2016) \\
+\textbf{VMware Certified Associate 6 - Data Center Virtualization Fundamentals} (VMware, Aug 2016) & \textbf{Implementation Engineer, Avamar Specialist Version 7.0} (Dell EMC, May 2015) \\
+\textbf{VCE Certified Converged Infrastructure Associate} (VCE, Apr 2015) & \textbf{EMC E20-005 Backup Recovery Systems and Architecture} (Dell EMC, Feb 2015) \\
+\textbf{ITIL Foundation Certificate in IT Service Management} (AXELOS, Jun 2014) & \textbf{Mac Integration Basics 10.9 Mavericks} (Apple, Nov 2013) \\
+\textbf{VMware Certified Associate - CLOUD} (VMware, Nov 2013) & \textbf{VMware Certified Associate - Workforce Mobility} (VMware, Nov 2013) \\
+\textbf{VMware Certified Associate Data Center Virtualization} (VMware, Oct 2013) & \\
+\end{tabular}
+\normalsize
+}
+\end{center}
+
+% ===============================
+% Compétences
+% ===============================
+\section{Compétences}
+
+\cvitem{Cloud}{AWS, Azure, VMware, Kubernetes, OpenStack}
+\cvitem{Automatisation}{Ansible, Terraform, Jenkins, GitLab CI}
+\cvitem{Sécurité}{NSA Standards, ITIL, ISO 9001, GDPR Compliance}
+\cvitem{Gestion de Projets}{Agile, Scrum, Six Sigma, Gestion de Budget}
+\cvitem{Développement}{Scripting (Python, Bash), PowerShell}
+\cvitem{Bases de Données}{MS SQL, PostgreSQL, Oracle}
+\cvitem{Réseaux}{Cisco, Huawei, SAN, LAN/WLAN Administration}
+
+% ===============================
+% Langues
+% ===============================
+\section{Langues}
+
+\cvitem{Français}{Langue maternelle}
+\cvitem{Anglais}{Courant}
+\cvitem{Slovaque}{Courant}
+\cvitem{Hongrois}{Intermédiaire}
+\cvitem{Allemand}{Débutant}
+
+% ===============================
+% Références
+% ===============================
+\section{Références}
+\cvitem{}{Fournies sur demande.}
+
+\end{document}
+
+
+here is my full linkedin experience:
+Experience
+
+
+ FlowBank logo
+Head of DevOps engineering
+Head of DevOps engineering
+FlowBank · Full-timeFlowBank · Full-time
+Jun 2023 - Jun 2024 · 1 yr 1 moJun 2023 to Jun 2024 · 1 yr 1 mo
+Genève, Suisse · On-siteGenève, Suisse · On-site
+As Head of DevOps and Infrastructure at FlowBank, I led key initiatives leveraging over 20 years of IT and project management expertise. I built a high-performing DevOps team and oversaw the development of Switzerland's first **Wi-Fi 7** campus. My expertise in **VMware**, **ITIL V3**, **Six Sigma**, and **Agile** methodologies ensured resilient infrastructure and efficient operations.
+
+A key success was implementing **AWS cloud services** and **Kubernetes microservices**, transforming FlowBank’s infrastructure to be more scalable and reliable. Additionally, I introduced **Teleport** for secure infrastructure access and **ServiceNow** for automated **CMDB**, streamlining operations and enhancing IT service management.
+
+I also spearheaded cost-saving initiatives by transitioning from **Cisco** to **Huawei** for networking and migrating databases from **MS SQL** to **PostgreSQL**, significantly reducing costs while maintaining system performance.
+
+Despite these successes, FlowBank faced financial difficulties, leading **FINMA** to initiate bankruptcy proceedings in June 2024 due to regulatory non-compliance. My efforts in modernizing infrastructure and automating processes were crucial achievements during this challenging period.
+
+Now, I am eager to apply my skills in AWS, automation, and infrastructure optimization to new opportunities that drive growth and efficiency.
+As Head of DevOps and Infrastructure at FlowBank, I led key initiatives leveraging over 20 years of IT and project management expertise. I built a high-performing DevOps team and oversaw the development of Switzerland's first **Wi-Fi 7** campus. My expertise in **VMware**, **ITIL V3**, **Six Sigma**, and **Agile** methodologies ensured resilient infrastructure and efficient operations. A key success was implementing **AWS cloud services** and **Kubernetes microservices**, transforming FlowBank’s infrastructure to be more scalable and reliable. Additionally, I introduced **Teleport** for secure infrastructure access and **ServiceNow** for automated **CMDB**, streamlining operations and enhancing IT service management. I also spearheaded cost-saving initiatives by transitioning from **Cisco** to **Huawei** for networking and migrating databases from **MS SQL** to **PostgreSQL**, significantly reducing costs while maintaining system performance. Despite these successes, FlowBank faced financial difficulties, leading **FINMA** to initiate bankruptcy proceedings in June 2024 due to regulatory non-compliance. My efforts in modernizing infrastructure and automating processes were crucial achievements during this challenging period. Now, I am eager to apply my skills in AWS, automation, and infrastructure optimization to new opportunities that drive growth and efficiency.
+Skills: Infrastructure · IT Projects · Strategic Vision · Entourage
+Skills: Infrastructure · IT Projects · Strategic Vision · Entourage
+
+ SIB Swiss Institute of Bioinformatics logo
+Team Lead, System Administration
+Team Lead, System Administration
+SIB Swiss Institute of Bioinformatics · Full-timeSIB Swiss Institute of Bioinformatics · Full-time
+Feb 2022 - Jun 2023 · 1 yr 5 mosFeb 2022 to Jun 2023 · 1 yr 5 mos
+Lausanne, Vaud, SwitzerlandLausanne, Vaud, Switzerland
+At the Swiss Institute of Bioinformatics (SIB), I served as the Team Leader of the SysAdmin Team, leading key infrastructure projects and managing team operations. My role included hiring, training, and distributing work among the team, ensuring effective collaboration and project delivery.
+
+A major accomplishment was upgrading the Lausanne BiomedIT node (https://www.biomedit.ch/home/biomed-it-infrastructure.html), enhancing its capacity to support bioinformatics research. I also led the transition of the campus and data center network from HP to Huawei, which improved network performance, scalability, and reduced costs.
+
+I managed the decommissioning of the High-Performance Computing (HPC) cluster, previously used for decoding DNA and RNA in oncology research to support personalized cancer treatments at Hôpitaux Universitaires de Genève (HUG). After deploying a more advanced HPC cluster, I oversaw the smooth retirement and recycling of the old system, ensuring continued research operations.
+
+Beyond the technical scope, my responsibilities included recruiting and training personnel, distributing tasks within the team based on individual strengths, and fostering a high-performing, collaborative environment. This role allowed me to significantly enhance SIB's infrastructure while supporting vital biomedical research.
+
+I am eager to bring my leadership and technical expertise to new challenges focused on infrastructure optimization and team management.
+At the Swiss Institute of Bioinformatics (SIB), I served as the Team Leader of the SysAdmin Team, leading key infrastructure projects and managing team operations. My role included hiring, training, and distributing work among the team, ensuring effective collaboration and project delivery. A major accomplishment was upgrading the Lausanne BiomedIT node (https://www.biomedit.ch/home/biomed-it-infrastructure.html), enhancing its capacity to support bioinformatics research. I also led the transition of the campus and data center network from HP to Huawei, which improved network performance, scalability, and reduced costs. I managed the decommissioning of the High-Performance Computing (HPC) cluster, previously used for decoding DNA and RNA in oncology research to support personalized cancer treatments at Hôpitaux Universitaires de Genève (HUG). After deploying a more advanced HPC cluster, I oversaw the smooth retirement and recycling of the old system, ensuring continued research operations. Beyond the technical scope, my responsibilities included recruiting and training personnel, distributing tasks within the team based on individual strengths, and fostering a high-performing, collaborative environment. This role allowed me to significantly enhance SIB's infrastructure while supporting vital biomedical research. I am eager to bring my leadership and technical expertise to new challenges focused on infrastructure optimization and team management.
+Skills: VMware Infrastructure · Infrastructure Management · Infrastructure · Office 365 · IT Projects · Strategic Vision · Storage Area Network (SAN) · Entourage
+Skills: VMware Infrastructure · Infrastructure Management · Infrastructure · Office 365 · IT Projects · Strategic Vision · Storage Area Network (SAN) · Entourage
+
+ Experis logo
+Chef de projet migration
+Chef de projet migration
+Experis · ContractExperis · Contract
+Jul 2021 - Jan 2022 · 7 mosJul 2021 to Jan 2022 · 7 mos
+Morges, Vaud, SwitzerlandMorges, Vaud, Switzerland
+As a **Project Manager**, I successfully led several key IT migration initiatives that involved complex coordination and technical execution. My responsibilities included:
+
+- **Migration of MS 365 Tenant to Tenant**: I managed the migration of Microsoft 365 environments, ensuring seamless data transfer and minimal downtime for end-users. This project required meticulous planning and coordination between teams to ensure smooth email, data, and user access migration.
+ 
+- **Coordination Between Swisscom and Tata Consultancy Services**: I facilitated effective communication and collaboration between **Swisscom** and **Tata Consultancy Services** to ensure alignment on timelines, technical requirements, and troubleshooting during the migration process.
+
+- **Active Directory Cleanup and Migration**: I oversaw the **Active Directory (AD) cleanup and migration**, ensuring that legacy data and accounts were cleaned up before migration. This step improved security and simplified user and resource management during the migration.
+
+- **Skype for Business to Microsoft Teams Migration**: I managed the **migration from Skype for Business to Microsoft Teams**, ensuring a smooth transition for users to adopt Teams as their primary communication tool. This project involved user training, troubleshooting, and ensuring continuity of service.
+
+- **Implementation of Hybrid Azure AD Joined**: I led the implementation of **Hybrid Azure Active Directory (AD) Joined** devices, enabling a seamless integration of on-premise AD with Azure AD, facilitating better management of devices and users across cloud and on-premise environments.
+
+- **Servers Migration to Azure**: I managed the **migration of servers to Azure**, helping reduce on-premise infrastructure costs and enhancing scalability and reliability through cloud infrastructure.
+As a **Project Manager**, I successfully led several key IT migration initiatives that involved complex coordination and technical execution. My responsibilities included: - **Migration of MS 365 Tenant to Tenant**: I managed the migration of Microsoft 365 environments, ensuring seamless data transfer and minimal downtime for end-users. This project required meticulous planning and coordination between teams to ensure smooth email, data, and user access migration. - **Coordination Between Swisscom and Tata Consultancy Services**: I facilitated effective communication and collaboration between **Swisscom** and **Tata Consultancy Services** to ensure alignment on timelines, technical requirements, and troubleshooting during the migration process. - **Active Directory Cleanup and Migration**: I oversaw the **Active Directory (AD) cleanup and migration**, ensuring that legacy data and accounts were cleaned up before migration. This step improved security and simplified user and resource management during the migration. - **Skype for Business to Microsoft Teams Migration**: I managed the **migration from Skype for Business to Microsoft Teams**, ensuring a smooth transition for users to adopt Teams as their primary communication tool. This project involved user training, troubleshooting, and ensuring continuity of service. - **Implementation of Hybrid Azure AD Joined**: I led the implementation of **Hybrid Azure Active Directory (AD) Joined** devices, enabling a seamless integration of on-premise AD with Azure AD, facilitating better management of devices and users across cloud and on-premise environments. - **Servers Migration to Azure**: I managed the **migration of servers to Azure**, helping reduce on-premise infrastructure costs and enhancing scalability and reliability through cloud infrastructure.
+Skills: VMware Infrastructure · Infrastructure Management · Infrastructure · Office 365 · IT Projects · Strategic Vision · Storage Area Network (SAN) · Entourage
+Skills: VMware Infrastructure · Infrastructure Management · Infrastructure · Office 365 · IT Projects · Strategic Vision · Storage Area Network (SAN) · Entourage
+
+Consultant Infrastructure Senior
+Consultant Infrastructure Senior
+Consultant Infrastructure Senior
+AiM Services · ContractAiM Services · Contract
+Feb 2021 - Apr 2021 · 3 mosFeb 2021 to Apr 2021 · 3 mos
+Geneva, SwitzerlandGeneva, Switzerland
+For a **major bank in Geneva**, I was responsible for creating the **technical documentation** and **user manuals** during the **Windows 10 migration** project. My role was focused on ensuring that both technical teams and end-users had clear, comprehensive guidelines for the migration process.
+
+### Key Responsibilities:
+- **Technical Documentation**: I wrote detailed documentation to guide IT teams through the migration process, including installation procedures, system configurations, and troubleshooting steps. This ensured that the migration could be executed smoothly and consistently across the bank’s systems.
+ 
+- **User Manuals**: I also developed user-friendly manuals for the bank’s employees, helping them transition smoothly to the new Windows 10 environment. These manuals covered basic system usage, new features, and solutions to common issues, enabling users to adapt quickly to the changes.
+
+This documentation played a critical role in supporting the IT migration team and ensuring that users experienced minimal disruption during the transition. I look forward to applying my skills in creating clear, effective documentation in future projects.
+For a **major bank in Geneva**, I was responsible for creating the **technical documentation** and **user manuals** during the **Windows 10 migration** project. My role was focused on ensuring that both technical teams and end-users had clear, comprehensive guidelines for the migration process. ### Key Responsibilities: - **Technical Documentation**: I wrote detailed documentation to guide IT teams through the migration process, including installation procedures, system configurations, and troubleshooting steps. This ensured that the migration could be executed smoothly and consistently across the bank’s systems. - **User Manuals**: I also developed user-friendly manuals for the bank’s employees, helping them transition smoothly to the new Windows 10 environment. These manuals covered basic system usage, new features, and solutions to common issues, enabling users to adapt quickly to the changes. This documentation played a critical role in supporting the IT migration team and ensuring that users experienced minimal disruption during the transition. I look forward to applying my skills in creating clear, effective documentation in future projects.
+Skills: Infrastructure · IT Projects
+Skills: Infrastructure · IT Projects
+
+ EHL  logo
+Digital Operations Manager
+Digital Operations Manager
+Ecole hôtelière de Lausanne · ContractEcole hôtelière de Lausanne · Contract
+Mar 2020 - Aug 2020 · 6 mosMar 2020 to Aug 2020 · 6 mos
+Lausanne Metropolitan AreaLausanne Metropolitan Area
+ helped me get this job
+LinkedIn helped me get this job
+As a **manager of a support team** of 10 people, I oversaw several critical areas of IT operations, from vendor and budget management to resource planning and crisis response. My role involved the following responsibilities:
+
+### Key Responsibilities:
+- **Team Management**: I led a team of 10 support professionals, ensuring efficient resolution of IT issues and maintaining high levels of service across the organization.
+- **Vendor Management and Enterprise Architecture**: I managed relationships with key vendors and supervised enterprise architecture and application development, ensuring that all systems aligned with the organization’s goals.
+- **Budget Management**: I was responsible for managing budgets for software, hardware, licenses, and IT projects. This included financial planning and ensuring that projects stayed within the allocated budget.
+- **Resource and COVID Crisis Management**: I managed team resources effectively, ensuring business continuity during the COVID crisis. This involved adapting to remote work conditions and implementing solutions to keep operations running smoothly.
+- **Project Development**: I worked closely with the business to transform ideas into actionable projects and useful tools, directly supporting business goals through IT solutions.
+
+### IT Project Manager for Singapore Campus:
+One of my significant achievements was leading an IT project for a new campus in Singapore with a budget exceeding **one million CHF**:
+- **Vendor Change**: I successfully changed the vendor in favor of **Huawei**, aligning the project with the best technology and financial outcomes.
+- **Project Overhaul**: I completely overhauled the project scope and targets, ensuring that the updated objectives were met within budget and on time.
+
+This diverse role allowed me to balance strategic IT leadership, hands-on project management, and operational efficiency, positioning the organization for long-term success.
+As a **manager of a support team** of 10 people, I oversaw several critical areas of IT operations, from vendor and budget management to resource planning and crisis response. My role involved the following responsibilities: ### Key Responsibilities: - **Team Management**: I led a team of 10 support professionals, ensuring efficient resolution of IT issues and maintaining high levels of service across the organization. - **Vendor Management and Enterprise Architecture**: I managed relationships with key vendors and supervised enterprise architecture and application development, ensuring that all systems aligned with the organization’s goals. - **Budget Management**: I was responsible for managing budgets for software, hardware, licenses, and IT projects. This included financial planning and ensuring that projects stayed within the allocated budget. - **Resource and COVID Crisis Management**: I managed team resources effectively, ensuring business continuity during the COVID crisis. This involved adapting to remote work conditions and implementing solutions to keep operations running smoothly. - **Project Development**: I worked closely with the business to transform ideas into actionable projects and useful tools, directly supporting business goals through IT solutions. ### IT Project Manager for Singapore Campus: One of my significant achievements was leading an IT project for a new campus in Singapore with a budget exceeding **one million CHF**: - **Vendor Change**: I successfully changed the vendor in favor of **Huawei**, aligning the project with the best technology and financial outcomes. - **Project Overhaul**: I completely overhauled the project scope and targets, ensuring that the updated objectives were met within budget and on time. This diverse role allowed me to balance strategic IT leadership, hands-on project management, and operational efficiency, positioning the organization for long-term success.
+Skills: Software Development · Infrastructure Management · Infrastructure · Office 365 · IT Projects · Strategic Vision
+Skills: Software Development · Infrastructure Management · Infrastructure · Office 365 · IT Projects · Strategic Vision
+
+ Hôpital du Valais logo
+Responsable de la gestion des changements et des problèmes IT
+Responsable de la gestion des changements et des problèmes IT
+Hôpital du Valais · Full-timeHôpital du Valais · Full-time
+Aug 2017 - Mar 2020 · 2 yrs 8 mosAug 2017 to Mar 2020 · 2 yrs 8 mos
+SionSion
+As the Responsible for Change Management and IT problems across all Valais hospitals, I was entrusted with overseeing key initiatives to ensure smooth IT operations and align with industry standards.
+
+Key Responsibilities:
+Change Management: I led a comprehensive overhaul of the change process to achieve ISO 9001 certification, aligned with ITIL standards. This included setting up a weekly Change Advisory Board (CAB) using a customized ServiceNow module to streamline and optimize the process for better IT service management.
+
+Cross-Functional Management: I managed and coordinated the DEV, INFRA, network, and medical device (MD) teams, ensuring that IT operations were synchronized across departments to meet hospital needs effectively.
+
+Demand Team Member: As part of the demand team, I was responsible for managing and implementing new software development projects or integrating off-the-shelf solutions that fit the hospital’s needs.
+
+Key Projects:
+Project Manager for Backup and Object Storage: I managed a project with a 1.5 million CHF budget, where I was responsible for writing technical specifications, preparing tenders, reviewing vendor offers, and overseeing the project execution from planning to final documentation.
+
+Phoenix Taskforce: I led the Phoenix Taskforce, aimed at improving Electronic Clinical Documentation (ECD). Through performance analysis, benchmarking, and monitoring, we enhanced the hospital’s data management systems.
+
+Oracle Database Performance Improvements: I led a major performance improvement project for the Oracle database infrastructure, utilizing scrum and story splitting methodologies within an Agile framework. This significantly improved performance and system responsiveness.
+As the Responsible for Change Management and IT problems across all Valais hospitals, I was entrusted with overseeing key initiatives to ensure smooth IT operations and align with industry standards. Key Responsibilities: Change Management: I led a comprehensive overhaul of the change process to achieve ISO 9001 certification, aligned with ITIL standards. This included setting up a weekly Change Advisory Board (CAB) using a customized ServiceNow module to streamline and optimize the process for better IT service management. Cross-Functional Management: I managed and coordinated the DEV, INFRA, network, and medical device (MD) teams, ensuring that IT operations were synchronized across departments to meet hospital needs effectively. Demand Team Member: As part of the demand team, I was responsible for managing and implementing new software development projects or integrating off-the-shelf solutions that fit the hospital’s needs. Key Projects: Project Manager for Backup and Object Storage: I managed a project with a 1.5 million CHF budget, where I was responsible for writing technical specifications, preparing tenders, reviewing vendor offers, and overseeing the project execution from planning to final documentation. Phoenix Taskforce: I led the Phoenix Taskforce, aimed at improving Electronic Clinical Documentation (ECD). Through performance analysis, benchmarking, and monitoring, we enhanced the hospital’s data management systems. Oracle Database Performance Improvements: I led a major performance improvement project for the Oracle database infrastructure, utilizing scrum and story splitting methodologies within an Agile framework. This significantly improved performance and system responsiveness.
+Skills: Software Development · Infrastructure Management · Office 365 · IT Projects
+Skills: Software Development · Infrastructure Management · Office 365 · IT Projects
+
+ Dimension Data logo
+Consultant
+Consultant
+Dimension DataDimension Data
+Jan 2014 - Aug 2017 · 3 yrs 8 mosJan 2014 to Aug 2017 · 3 yrs 8 mos
+Brussels Metropolitan Area · On-siteBrussels Metropolitan Area · On-site
+As a Consultant for various clients, I worked on a range of IT projects, providing expertise in infrastructure modernization, migrations, and data protection solutions.
+
+Key Projects:
+O365 Migration for an NGO: I led the migration to Microsoft Office 365, ensuring a smooth transition with minimal disruption. This involved planning, execution, and post-migration support, improving collaboration tools and cloud services for the organization.
+
+VDI Upgrade and Redesign for a Private Bank: I managed the upgrade and redesign of the VMware Horizon Virtual Desktop Infrastructure (VDI) for a private bank. This project involved enhancing the security, performance, and user experience of the bank’s virtual desktop environment, resulting in a more efficient and secure system.
+
+New Infrastructure for a Division of a Private Bank: I designed and implemented a complete new IT infrastructure for a division of a private bank. This involved setting up scalable systems that ensured business continuity and supported the division's operational needs.
+
+Backup Solution Implementation for a Life Insurance Company and Weapons Manufacturer: I implemented a backup solution using Avamar and Data Domain for both a life insurance company and a weapons manufacturer. This provided robust, compliant data protection with fast recovery capabilities and efficient disaster recovery planning.
+
+Level 2 Server Administration for an International Sports Association: I provided Level 2 server administration services, managing server environments for an international sports association. My role involved ensuring server stability, resolving escalated issues, and maintaining high availability for global operations.
+
+These projects highlight my ability to provide technical leadership and hands-on implementation across diverse industries, driving improvements in performance, security, and operational efficiency.
+As a Consultant for various clients, I worked on a range of IT projects, providing expertise in infrastructure modernization, migrations, and data protection solutions. Key Projects: O365 Migration for an NGO: I led the migration to Microsoft Office 365, ensuring a smooth transition with minimal disruption. This involved planning, execution, and post-migration support, improving collaboration tools and cloud services for the organization. VDI Upgrade and Redesign for a Private Bank: I managed the upgrade and redesign of the VMware Horizon Virtual Desktop Infrastructure (VDI) for a private bank. This project involved enhancing the security, performance, and user experience of the bank’s virtual desktop environment, resulting in a more efficient and secure system. New Infrastructure for a Division of a Private Bank: I designed and implemented a complete new IT infrastructure for a division of a private bank. This involved setting up scalable systems that ensured business continuity and supported the division's operational needs. Backup Solution Implementation for a Life Insurance Company and Weapons Manufacturer: I implemented a backup solution using Avamar and Data Domain for both a life insurance company and a weapons manufacturer. This provided robust, compliant data protection with fast recovery capabilities and efficient disaster recovery planning. Level 2 Server Administration for an International Sports Association: I provided Level 2 server administration services, managing server environments for an international sports association. My role involved ensuring server stability, resolving escalated issues, and maintaining high availability for global operations. These projects highlight my ability to provide technical leadership and hands-on implementation across diverse industries, driving improvements in performance, security, and operational efficiency.
+Skills: Software Development · Infrastructure Management · Infrastructure · Office 365 · IT Projects · Storage Area Network (SAN)
+Skills: Software Development · Infrastructure Management · Infrastructure · Office 365 · IT Projects · Storage Area Network (SAN)
+
+ AT&T logo
+Senior Systems Engineer
+Senior Systems Engineer
+AT&TAT&T
+Feb 2012 - Jan 2014 · 2 yrsFeb 2012 to Jan 2014 · 2 yrs
+BratislavaBratislava
+As the **Technical Team Leader** for the **Windows Tier 3** and **Linux Tier 3** support teams, I managed a team of 50 engineers in Bratislava, representing 16 nationalities, and oversaw the support of **40,000 servers**. My responsibilities included **technical training** in **VMware**, **Root Cause Analysis (RCA)**, and troubleshooting, along with **interviewing and onboarding** new team members.
+
+I led **server hardening** based on **NSA standards** and managed **Citrix and RDS deployment**, supporting **700 Citrix servers** for point-of-sale systems. Additionally, I managed **private cloud infrastructures**, focusing on **capacity planning** and automation.
+
+I also worked on **King's Mountain data center** in North Carolina, where **Phase 1 housed 100,000 Cisco UCS blades** and utilized an **FCoE SAN network** for high-performance data handling.
+
+In my role, I handled **22,000+ virtual desktops** and **20,000 virtual machines** on **1800+ ESX hosts**, leading the **ESX 5.0.2 upgrade** and overseeing **SCCM 2012 security updates** for **40,000 servers** monthly. As **Disaster Recovery Champion**, I recovered **150TB** of data after a SAN outage and managed **Avamar administration**.
+
+I was honored with a **citation** for resolving the **largest IT outage in AT&T's history** and managed **weekly escalations** involving natural disasters and system failures. Additionally, I approved all **change requests** within the infrastructure.
+
+I also led the **$1.7 million lab data center project** in EMEA, managing the project from planning through to successful completion.
+As the **Technical Team Leader** for the **Windows Tier 3** and **Linux Tier 3** support teams, I managed a team of 50 engineers in Bratislava, representing 16 nationalities, and oversaw the support of **40,000 servers**. My responsibilities included **technical training** in **VMware**, **Root Cause Analysis (RCA)**, and troubleshooting, along with **interviewing and onboarding** new team members. I led **server hardening** based on **NSA standards** and managed **Citrix and RDS deployment**, supporting **700 Citrix servers** for point-of-sale systems. Additionally, I managed **private cloud infrastructures**, focusing on **capacity planning** and automation. I also worked on **King's Mountain data center** in North Carolina, where **Phase 1 housed 100,000 Cisco UCS blades** and utilized an **FCoE SAN network** for high-performance data handling. In my role, I handled **22,000+ virtual desktops** and **20,000 virtual machines** on **1800+ ESX hosts**, leading the **ESX 5.0.2 upgrade** and overseeing **SCCM 2012 security updates** for **40,000 servers** monthly. As **Disaster Recovery Champion**, I recovered **150TB** of data after a SAN outage and managed **Avamar administration**. I was honored with a **citation** for resolving the **largest IT outage in AT&T's history** and managed **weekly escalations** involving natural disasters and system failures. Additionally, I approved all **change requests** within the infrastructure. I also led the **$1.7 million lab data center project** in EMEA, managing the project from planning through to successful completion.
+Skills: VMware Infrastructure · Infrastructure Management · Infrastructure · IT Projects · Storage Area Network (SAN)
+Skills: VMware Infrastructure · Infrastructure Management · Infrastructure · IT Projects · Storage Area Network (SAN)
+
+WSHtier3teamWSHtier3team
+Team Picture for the newsletterTeam Picture for the newsletter
+
+ Ingram Micro Commerce & Lifecycle Services logo
+Security and Infrastructure Manager
+Security and Infrastructure Manager
+BrightPointBrightPoint
+Feb 2010 - Feb 2012 · 2 yrs 1 moFeb 2010 to Feb 2012 · 2 yrs 1 mo
+Région de Bratislava, SlovaquieRégion de Bratislava, Slovaquie
+As the **Security and Infrastructure Manager** at **BrightPoint** from February 2010 to February 2012 in Bratislava, Slovakia, I held key responsibilities that encompassed both security and IT infrastructure management.
+
+### Key Responsibilities:
+- **Security Management**: I was responsible for **creating and managing the design process and documentation** required to meet the security levels specified by **RIM (Research In Motion)**. This involved drafting detailed plans and ensuring they were adhered to throughout the operation.
+ 
+- **Vendor Coordination**: I coordinated with **G4S** to implement **amendments in service contracts** related to security services, ensuring that all contractual obligations aligned with our evolving security needs.
+
+- **Stakeholder Engagement**: I conducted **monthly meetings with security managers** from major companies across Central Europe, discussing security trends, best practices, and regional challenges.
+
+- **Personnel and IT Infrastructure Management**: I was in charge of overseeing personnel management, including **overtime, holidays, and hiring**, as well as managing the **IT infrastructure**. This involved ensuring that the infrastructure supported business needs while maintaining optimal performance and security.
+
+- **Strategic Planning**: I actively participated in **management meetings** to discuss and contribute to company strategy, focusing on security and IT infrastructure considerations that impacted the broader business goals.
+
+- **Compliance and Licensing**: I was responsible for obtaining and implementing a new **license from the fire department**, ensuring full compliance with safety regulations.
+
+- **Technical Support**: I provided **VMware and Windows Server support**, managing both virtualized environments and server operations to maintain system stability and performance.
+As the **Security and Infrastructure Manager** at **BrightPoint** from February 2010 to February 2012 in Bratislava, Slovakia, I held key responsibilities that encompassed both security and IT infrastructure management. ### Key Responsibilities: - **Security Management**: I was responsible for **creating and managing the design process and documentation** required to meet the security levels specified by **RIM (Research In Motion)**. This involved drafting detailed plans and ensuring they were adhered to throughout the operation. - **Vendor Coordination**: I coordinated with **G4S** to implement **amendments in service contracts** related to security services, ensuring that all contractual obligations aligned with our evolving security needs. - **Stakeholder Engagement**: I conducted **monthly meetings with security managers** from major companies across Central Europe, discussing security trends, best practices, and regional challenges. - **Personnel and IT Infrastructure Management**: I was in charge of overseeing personnel management, including **overtime, holidays, and hiring**, as well as managing the **IT infrastructure**. This involved ensuring that the infrastructure supported business needs while maintaining optimal performance and security. - **Strategic Planning**: I actively participated in **management meetings** to discuss and contribute to company strategy, focusing on security and IT infrastructure considerations that impacted the broader business goals. - **Compliance and Licensing**: I was responsible for obtaining and implementing a new **license from the fire department**, ensuring full compliance with safety regulations. - **Technical Support**: I provided **VMware and Windows Server support**, managing both virtualized environments and server operations to maintain system stability and performance.
+Skills: Infrastructure · Storage Area Network (SAN)
+Skills: Infrastructure · Storage Area Network (SAN)
+
+ Johnson Controls logo
+Systems Administrator
+Systems Administrator
+Johnson ControlsJohnson Controls
+Jul 2008 - Jan 2010 · 1 yr 7 mosJul 2008 to Jan 2010 · 1 yr 7 mos
+Région de Bratislava, SlovaquieRégion de Bratislava, Slovaquie
+As a **Systems Administrator** at **Johnson Controls** from July 2008 to January 2010 in Bratislava, Slovakia, I was responsible for a broad range of IT infrastructure and system management tasks supporting the company’s European headquarters, which served **600 users**.
+
+### Key Responsibilities:
+- **Site and Server Administration**: I managed the day-to-day operations of the **IT department**, overseeing server administration, maintenance, and performance monitoring to ensure uptime and reliability.
+ 
+- **Data Backup and ISO Compliance**: I handled the **data backup process**, ensuring that backup tapes were stored offsite in **fireproof conditions**, compliant with **ISO 9001** standards, and readily available for disaster recovery.
+
+- **LAN/WLAN Administration**: I administered the **local area network (LAN)** and **wireless LAN (WLAN)**, managing configurations, connectivity, and troubleshooting issues to provide seamless access for users.
+
+- **Server and SAN Support**: I provided **VMware** and **Windows Server 2008** support, managing virtual machines and maintaining the **Storage Area Network (SAN)** to support the data storage needs of the headquarters.
+
+- **Contracts and Procurement**: I was responsible for **reviewing contracts** related to IT purchases, ensuring that the terms and technology met the company’s needs, while optimizing costs.
+
+- **Disaster Simulations**: I led **disaster recovery simulations** for the **local data center**, ensuring preparedness for potential outages and data recovery scenarios.
+
+- **Infrastructure Expansion**: I coordinated the **expansion project** for the headquarters, managing the installation of **wiring, electricity, a new server room**, and a **new PBX system**, ensuring the infrastructure could support future growth.
+
+- **Microwave Internet Project**: I collaborated on a project to implement **microwave internet access**, improving connectivity and redundancy for the headquarters.
+As a **Systems Administrator** at **Johnson Controls** from July 2008 to January 2010 in Bratislava, Slovakia, I was responsible for a broad range of IT infrastructure and system management tasks supporting the company’s European headquarters, which served **600 users**. ### Key Responsibilities: - **Site and Server Administration**: I managed the day-to-day operations of the **IT department**, overseeing server administration, maintenance, and performance monitoring to ensure uptime and reliability. - **Data Backup and ISO Compliance**: I handled the **data backup process**, ensuring that backup tapes were stored offsite in **fireproof conditions**, compliant with **ISO 9001** standards, and readily available for disaster recovery. - **LAN/WLAN Administration**: I administered the **local area network (LAN)** and **wireless LAN (WLAN)**, managing configurations, connectivity, and troubleshooting issues to provide seamless access for users. - **Server and SAN Support**: I provided **VMware** and **Windows Server 2008** support, managing virtual machines and maintaining the **Storage Area Network (SAN)** to support the data storage needs of the headquarters. - **Contracts and Procurement**: I was responsible for **reviewing contracts** related to IT purchases, ensuring that the terms and technology met the company’s needs, while optimizing costs. - **Disaster Simulations**: I led **disaster recovery simulations** for the **local data center**, ensuring preparedness for potential outages and data recovery scenarios. - **Infrastructure Expansion**: I coordinated the **expansion project** for the headquarters, managing the installation of **wiring, electricity, a new server room**, and a **new PBX system**, ensuring the infrastructure could support future growth. - **Microwave Internet Project**: I collaborated on a project to implement **microwave internet access**, improving connectivity and redundancy for the headquarters.
+Skills: Infrastructure
+Skills: Infrastructure
+
+ Hewlett Packard Enterprise logo
+Systems engineer
+Systems engineer
+Hewlett-PackardHewlett-Packard
+Mar 2005 - Jun 2008 · 3 yrs 4 mosMar 2005 to Jun 2008 · 3 yrs 4 mos
+Région de Bratislava, SlovaquieRégion de Bratislava, Slovaquie
+As a **Systems Engineer** at **Hewlett-Packard** from March 2005 to June 2008 in Bratislava, Slovakia, I was responsible for supporting HP’s internal customers and managing a vast infrastructure of **5,000 servers** across multiple and distant data centers.
+
+### Key Responsibilities:
+- **Incident and Service Management**: I handled **incident resolution** and service calls escalated from 1st line support, ensuring quick resolution of technical issues for internal customers.
+ 
+- **Server Patching and Administration**: I conducted **monthly server patching** using **SMS 2003**, ensuring all servers were updated and secure. I also performed **remote system administration** via **Terminal Services** and **PC Duo**, managing systems efficiently across distant data centers.
+
+- **ITIL Process Management**: I applied **ITIL principles**, focusing primarily on **Incident Management (90%)**, while also supporting **Capacity**, **Change**, and **Problem Management (5%)** to ensure smooth operations and minimize disruptions.
+
+- **Active Directory, DHCP, and DNS Management**: I managed **Active Directory**, creating and managing users, groups, and computers. Additionally, I administered **DHCP** (reservations, exclusions, scopes) and **DNS** (record configurations, replications), ensuring network functionality and domain stability.
+
+- **HP ProLiant and VMware Support**: I troubleshooted **HP ProLiant servers** and led the **P2V migration** of several hundred physical servers to HP’s **VMware private cloud**, improving infrastructure efficiency.
+
+- **MS Clustering and Team Collaboration**: I resolved issues related to **MS clustering**, particularly with file and print clusters, and worked closely with other teams to minimize IT outages and optimize performance.
+
+These responsibilities allowed me to develop strong expertise in **infrastructure management**, server migration, and virtualization, helping ensure that HP’s internal IT systems operated at peak efficiency.
+As a **Systems Engineer** at **Hewlett-Packard** from March 2005 to June 2008 in Bratislava, Slovakia, I was responsible for supporting HP’s internal customers and managing a vast infrastructure of **5,000 servers** across multiple and distant data centers. ### Key Responsibilities: - **Incident and Service Management**: I handled **incident resolution** and service calls escalated from 1st line support, ensuring quick resolution of technical issues for internal customers. - **Server Patching and Administration**: I conducted **monthly server patching** using **SMS 2003**, ensuring all servers were updated and secure. I also performed **remote system administration** via **Terminal Services** and **PC Duo**, managing systems efficiently across distant data centers. - **ITIL Process Management**: I applied **ITIL principles**, focusing primarily on **Incident Management (90%)**, while also supporting **Capacity**, **Change**, and **Problem Management (5%)** to ensure smooth operations and minimize disruptions. - **Active Directory, DHCP, and DNS Management**: I managed **Active Directory**, creating and managing users, groups, and computers. Additionally, I administered **DHCP** (reservations, exclusions, scopes) and **DNS** (record configurations, replications), ensuring network functionality and domain stability. - **HP ProLiant and VMware Support**: I troubleshooted **HP ProLiant servers** and led the **P2V migration** of several hundred physical servers to HP’s **VMware private cloud**, improving infrastructure efficiency. - **MS Clustering and Team Collaboration**: I resolved issues related to **MS clustering**, particularly with file and print clusters, and worked closely with other teams to minimize IT outages and optimize performance. These responsibilities allowed me to develop strong expertise in **infrastructure management**, server migration, and virtualization, helping ensure that HP’s internal IT systems operated at peak efficiency.
+Skills: Infrastructure · Storage Area Network (SAN)
+Skills: Infrastructure · Storage Area Network (SAN)
+
+ QUADRIA logo
+Administrateur systemes
+Administrateur systemes
+QUADRIAQUADRIA
+May 2003 - Jan 2005 · 1 yr 9 mosMay 2003 to Jan 2005 · 1 yr 9 mos
+As a **Systems Administrator** at **Quadria** from May 2003 to January 2005, I handled various IT projects and system administration tasks for multiple clients, providing both technical support and leadership.
+
+### Key Responsibilities:
+- **Technical Support Team Manager at Veolia (World Headquarters, Paris)**: I led a **migration project** from **Windows 2000 to Windows XP** for **843 computers**. My role included **project preparation**, **team management**, and training a 20-person team to execute the migration successfully.
+
+- **IT Technician at Quadria (Rouen, France)**: I managed several key IT infrastructure projects, including the installation of **150 desktops** for the **Regional Council of Lower Normandy**. I also supported the **General Council of Seine-Maritime**, where I oversaw the **Active Directory integration** of **25 new Macintoshes** and replaced older Macs at the printing house.
+
+- **Citrix and VMware Support**: I provided support for **Citrix users**, maintaining a Citrix farm with **30 servers**. I also deployed **VMware ESX 2.5** and provided **SAN support**, contributing to the stability and performance of the infrastructure.
+
+- **Linux and SGI IRIX Support**: I managed **Linux** environments and provided **SGI IRIX 6.5** support on **O2** and **Octane Workstations** for specialized applications.
+
+- **Novell and Active Directory Migration**: I led a large-scale migration of **NT/Novell** systems to **Active Directory (Windows 2000)** and **Novell eDirectory**, upgrading **ZENworks** from version 4 to 7 for **1,800 computers**. This project involved significant planning and technical execution.
+
+- **Network Infrastructure Upgrades**: I rewired network bays and installed new racks, switches, servers, and Blade Centers at the General Council of Seine-Maritime’s main site, ensuring a more robust and scalable network infrastructure.
+As a **Systems Administrator** at **Quadria** from May 2003 to January 2005, I handled various IT projects and system administration tasks for multiple clients, providing both technical support and leadership. ### Key Responsibilities: - **Technical Support Team Manager at Veolia (World Headquarters, Paris)**: I led a **migration project** from **Windows 2000 to Windows XP** for **843 computers**. My role included **project preparation**, **team management**, and training a 20-person team to execute the migration successfully. - **IT Technician at Quadria (Rouen, France)**: I managed several key IT infrastructure projects, including the installation of **150 desktops** for the **Regional Council of Lower Normandy**. I also supported the **General Council of Seine-Maritime**, where I oversaw the **Active Directory integration** of **25 new Macintoshes** and replaced older Macs at the printing house. - **Citrix and VMware Support**: I provided support for **Citrix users**, maintaining a Citrix farm with **30 servers**. I also deployed **VMware ESX 2.5** and provided **SAN support**, contributing to the stability and performance of the infrastructure. - **Linux and SGI IRIX Support**: I managed **Linux** environments and provided **SGI IRIX 6.5** support on **O2** and **Octane Workstations** for specialized applications. - **Novell and Active Directory Migration**: I led a large-scale migration of **NT/Novell** systems to **Active Directory (Windows 2000)** and **Novell eDirectory**, upgrading **ZENworks** from version 4 to 7 for **1,800 computers**. This project involved significant planning and technical execution. - **Network Infrastructure Upgrades**: I rewired network bays and installed new racks, switches, servers, and Blade Centers at the General Council of Seine-Maritime’s main site, ensuring a more robust and scalable network infrastructure.
+Skills: Infrastructure
+Skills: Infrastructure
+
+Technicien Informatique
+Technicien Informatique
+Technicien Informatique
+IOR SystemesIOR Systemes
+Sep 1999 - Oct 2002 · 3 yrs 2 mosSep 1999 to Oct 2002 · 3 yrs 2 mos
+As an **IT Technician** at **IOR Systemes** from September 1999 to October 2002, I was responsible for managing IT infrastructure and systems administration for small and medium-sized enterprises (SMEs) in Paris, while alternating my duties as part of my **BTS CESI** apprenticeship.
+
+### Key Responsibilities:
+- **Systems Administrator**: I provided full **systems administration** services for SMEs, handling tasks such as **Windows domain migrations** and **domain creation** for business environments.
+ 
+- **Exchange 2000 Support**: I managed **Exchange 2000** environments, providing technical support to ensure reliable email services and effective communication for the organizations.
+
+- **Multi-Platform Support**: I supported a range of operating systems, including **Linux**, **Mac OS**, and **SGI** workstations, ensuring smooth functionality and performance across different platforms.
+
+- **Disaster Recovery Specialist**: I was responsible for **disaster recovery** planning and execution, ensuring that businesses could recover critical data and resume operations after system failures or incidents.
+
+- **Cisco Router Deployment**: I deployed and configured **Cisco routers** for SME clients, improving network reliability and connectivity.
+
+- **Novell NetWare and GroupWise Support**: I provided support for **Novell NetWare** and **GroupWise**, managing file sharing, email, and directory services within the businesses.
+
+- **On-Site Detachment**: I was later detached to **Merisant (formerly Monsanto)** in Paris, where I handled **Windows** administration, **Business Objects** management, and **GM image creation and deployment**, contributing to their IT operations.
+
+My role at IOR Systemes allowed me to develop a broad skill set in infrastructure management, multi-platform support, and disaster recovery, contributing to the IT stability of various SMEs and large organizations.
+As an **IT Technician** at **IOR Systemes** from September 1999 to October 2002, I was responsible for managing IT infrastructure and systems administration for small and medium-sized enterprises (SMEs) in Paris, while alternating my duties as part of my **BTS CESI** apprenticeship. ### Key Responsibilities: - **Systems Administrator**: I provided full **systems administration** services for SMEs, handling tasks such as **Windows domain migrations** and **domain creation** for business environments. - **Exchange 2000 Support**: I managed **Exchange 2000** environments, providing technical support to ensure reliable email services and effective communication for the organizations. - **Multi-Platform Support**: I supported a range of operating systems, including **Linux**, **Mac OS**, and **SGI** workstations, ensuring smooth functionality and performance across different platforms. - **Disaster Recovery Specialist**: I was responsible for **disaster recovery** planning and execution, ensuring that businesses could recover critical data and resume operations after system failures or incidents. - **Cisco Router Deployment**: I deployed and configured **Cisco routers** for SME clients, improving network reliability and connectivity. - **Novell NetWare and GroupWise Support**: I provided support for **Novell NetWare** and **GroupWise**, managing file sharing, email, and directory services within the businesses. - **On-Site Detachment**: I was later detached to **Merisant (formerly Monsanto)** in Paris, where I handled **Windows** administration, **Business Objects** management, and **GM image creation and deployment**, contributing to their IT operations. My role at IOR Systemes allowed me to develop a broad skill set in infrastructure management, multi-platform support, and disaster recovery, contributing to the IT stability of various SMEs and large organizations.
+Skills: Infrastructure
+
+
+Keep only the last 10 years of pro experience.
