@@ -2,7 +2,7 @@
 
 Reference: https://github.com/AI4Finance-LLC/FinRL
 
-This code  defines a class BinanceProcessor which is used to process financial data from the Binance exchange. It
+This code defines a class BinanceProcessor which is used to process financial data from the Binance exchange. It
 utilizes the Client class from the binance library to interact with the Binance API and the talib library to perform
 technical analysis on the data.
 
@@ -88,9 +88,7 @@ class BinanceProcessor():
         return data, price_array, tech_array, time_array
 
     # main functions
-    def download_data(self, ticker_list, start_date, end_date,
-                      time_interval):
-
+    def download_data(self, ticker_list, start_date, end_date, time_interval):
         self.start_time = start_date
         self.end_time = end_date
         self.interval = time_interval
@@ -102,7 +100,7 @@ class BinanceProcessor():
             df = hist_data.iloc[:-1]
             df = df.dropna()
             df['tic'] = i
-            final_df = pd.concat([final_df, df], ignore_index=True)
+            final_df = pd.concat([final_df, df], ignore_index=True)  # Fixed: Replaced append with concat
 
         return final_df
 
@@ -123,18 +121,20 @@ class BinanceProcessor():
             coin_df = self.get_TALib_features_for_each_coin(coin_df)
 
             # Append constructed tic_df
-            final_df = pd.concat([final_df, coin_df], ignore_index=True)
+            final_df = pd.concat([final_df, coin_df], ignore_index=True)  # Fixed: Replaced append with concat
 
         return final_df
 
     def drop_correlated_features(self, df):
+        # Drop correlated features
         numeric_df = df.select_dtypes(include=['float64', 'int64'])  # Select only numeric columns
-corr_matrix = numeric_df.corr().abs()
-        upper_tri = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
-        to_drop = [column for column in upper_tri.columns if any(upper_tri[column] > self.correlation_threshold)]
+        corr_matrix = numeric_df.corr().abs()
+        upper_tri = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))  # Fixed: np.bool to bool
+        cols_to_drop = [column for column in upper_tri.columns if any(upper_tri[column] > self.correlation_threshold)]
 
-        to_drop.remove('close')
-        print('according to analysis, drop: ', to_drop)
+        if 'close' in cols_to_drop:
+            cols_to_drop.remove('close')  # Ensure 'close' isn’t dropped
+        print('according to analysis, drop: ', cols_to_drop)
         real_drop = ['high', 'low', 'open', 'macd', 'cci', 'roc', 'willr']
         print('dropping for model consistency: ', real_drop)
 
@@ -143,7 +143,6 @@ corr_matrix = numeric_df.corr().abs()
 
     def add_turbulence(self, df):
         print('Turbulence not supported yet. Return original DataFrame.')
-
         return df
 
     def add_5m_CVIX(self, df):
@@ -160,7 +159,7 @@ corr_matrix = numeric_df.corr().abs()
     def df_to_array(self, df, if_vix):
         self.tech_indicator_list = list(df.columns)
         self.tech_indicator_list.remove('tic')
-        print('adding technical indiciators (no:', len(self.tech_indicator_list), ') :', self.tech_indicator_list)
+        print('adding technical indicators (no:', len(self.tech_indicator_list), '):', self.tech_indicator_list)
 
         unique_ticker = df.tic.unique()
         if_first_time = True
@@ -198,19 +197,17 @@ corr_matrix = numeric_df.corr().abs()
         data = data.drop(labels=['close_time', 'quote_av', 'trades', 'tb_base_av', 'tb_quote_av', 'ignore'], axis=1)
         if len(data_df) > 0:
             temp_df = pd.DataFrame(data)
-            data_df = data_df.append(temp_df)
+            data_df = pd.concat([data_df, temp_df], ignore_index=True)  # Fixed: Replaced append with concat
         else:
             data_df = data
 
         data_df = data_df.apply(pd.to_numeric, errors='coerce')
         data_df['time'] = [datetime.fromtimestamp(x / 1000.0) for x in data_df.timestamp]
-        # data.drop(labels=["timestamp"], axis=1)
         data_df.index = [x for x in range(len(data_df))]
 
         return data_df
 
     def get_TALib_features_for_each_coin(self, tic_df):
-
         tic_df['rsi'] = RSI(tic_df['close'], timeperiod=14)
         tic_df['macd'], _, _ = MACD(tic_df['close'], fastperiod=12,
                                     slowperiod=26, signalperiod=9)
