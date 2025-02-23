@@ -241,7 +241,9 @@ def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
         raise ValueError("The passed cross-validation object should have a member cv.embargo_td defining the embargo"
                          "time.")
     last_test_eval_time = cv.eval_times.iloc[test_indices[test_indices <= test_fold_end]].max()
-    min_train_index = len(cv.pred_times[cv.pred_times <= last_test_eval_time + cv.embargo_td])
+    # Convert last_test_eval_time (likely an index or int) to a timestamp matching pred_times
+last_test_eval_time_ts = cv.pred_times.iloc[int(last_test_eval_time)]  # Convert index to timestamp
+min_train_index = len(cv.pred_times[cv.pred_times <= last_test_eval_time_ts + cv.embargo_td])
     if min_train_index < cv.indices.shape[0]:
         allowed_indices = np.concatenate((cv.indices[:test_fold_end], cv.indices[min_train_index:]))
         train_indices = np.intersect1d(train_indices, allowed_indices)
