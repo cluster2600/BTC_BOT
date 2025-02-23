@@ -1,109 +1,76 @@
-# Binance Futures HFT Trading Bot with Random Forest
+# FinRL_Crypto_HFT: Deep Reinforcement Learning and Random Forest for Binance Futures Trading  
+![banner](https://user-images.githubusercontent.com/69801109/214294114-a718d378-6857-4182-9331-20869d64d3d9.png)  
+This project merges Maxime Grenu's Binance Futures HFT Trading Bot with Random Forest with FinRL_Crypto by Berend Jelmer Dirk Gort et al., combining Deep Reinforcement Learning (DRL) with a high-frequency trading (HFT) system for Binance Futures, focusing on **BTC/USDT**. It tackles overfitting in financial RL and uses a Random Forest model with indicators (SMA, RSI, MACD, Bollinger Bands) for BUY/SELL/HOLD decisions. Tested on multiple cryptocurrencies and market crashes, it aims to outperform traditional strategies.  
+**Warning:** For educational use only. Not for production without validation. Leveraged trading is high-risk; use simulation/Testnet first.  
 
-This project implements a high-frequency trading (HFT) system for Binance Futures, focused on the **BTC/USDT** pair. The bot uses financial indicators (SMA, RSI, MACD, Bollinger Bands) as well as a pre-trained Random Forest model to make trading decisions (BUY, SELL, or HOLD).
+## Features  
+- **Hybrid Decision-Making**: DRL (PPO, DDPG, SAC via ElegantRL) + Random Forest.  
+- **Binance Futures**: `ccxt` API, Spot-to-Futures transfers (USDT, BTC, BNB).  
+- **Indicators**: SMA, RSI, MACD, Bollinger Bands, TA-Lib (CCI, DX, ROC, etc.).  
+- **Overfitting Mitigation**: Walkforward, K-Fold CV, CPCV for DRL.  
+- **Order Management**: Minimums (0.00105 BTC, 100 USDT), 20x leverage.  
+- **Real-Time**: WebSocket data, Telegram notifications.  
+- **Backtesting**: PBO and performance metrics.  
 
-**Warning:**  
-This project is provided for educational purposes only. It is not intended for production use without thorough validation and adaptation to real market conditions. Trading on leveraged markets carries significant risks and can lead to substantial financial losses. Use this code in simulation or on Binance Futures' testnet before any live deployment.
+## Paper  
+[Deep Reinforcement Learning for Cryptocurrency Trading](https://arxiv.org/abs/2209.05559) by Berend Jelmer Dirk Gort et al.  
 
-## Features
-
-- **Connection to Binance Futures** via the ccxt API.  
-- Automatic transfer of funds from the Spot account to the Futures account (USDT, BTC, and BNB).  
-- Calculation of financial indicators based on historical price data (SMA, RSI, MACD, Bollinger Bands).  
-- Prediction of trading decisions (BUY, SELL, or HOLD) using a pre-trained Random Forest model (file `model_rf.pkl`).  
-- Execution of market orders based on the predicted decision.  
-- Verification and adjustment of order quantities to meet the minimum requirements (e.g., 0.001 BTC for BTC/USDT).  
-- Fallback management: for example, if the BTC balance is insufficient for selling, the decision is forced to BUY.
-
-## Prerequisites
-
+## Prerequisites  
 - **Python 3.x**  
-- Required Python modules (installable via pip):  
-  - `ccxt`  
-  - `numpy`  
-  - `pandas`  
-  - `joblib`  
-  - `requests` (installed with ccxt)  
-- A Binance account with Futures API access.  
-- An `apikeys.txt` file containing your Binance API keys in the following format:
-    ```
-    BINANCE_API_KEY=YourAPIKey
-    BINANCE_API_SECRET=YourAPISecret
-    ```
+- Modules: `ccxt`, `numpy`, `pandas`, `joblib`, `binance`, `talib`, `requests`, `yfinance` (optional), `telebot`, `websocket-client`, ElegantRL dependencies.  
+- Binance Futures API access.  
+- Config: `apikeys.txt` (`BINANCE_API_KEY`, `BINANCE_API_SECRET`), `secrets.txt` (`TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`).  
 
-## Installation
+## Installation  
+1. Clone: `git clone <repository_url> && cd FinRL_Crypto_HFT`  
+2. Virtual env: `python -m venv myenv && source myenv/bin/activate` (Linux/MacOS) or `myenv\Scripts\activate` (Windows)  
+3. Install: `pip install -r requirements.txt`  
+4. Add `apikeys.txt` and `secrets.txt`.  
 
-1. Clone this repository or download the source code.
-2. Create a virtual environment (optional but recommended):
-    
-    (Linux/MacOS)
-    ```
-    python -m venv myenv
-    source myenv/bin/activate
-    ```
-    
-    (Windows)
-    ```
-    python -m venv myenv
-    myenv\Scripts\activate
-    ```
-3. Install the required dependencies:
-    
-    ```
-    pip install ccxt numpy pandas joblib
-    ```
-4. Place your `apikeys.txt` file in the same directory as the script.
+## How to Use  
+### Configuration  
+Edit `config_main.py`: validation methods, candle counts, tickers (e.g., ["BTC/USDT"]), indicators, trade dates.  
+### Folders  
+- `data`: Training/validation, `trade_data` subfolder.  
+- `drl_agents`: ElegantRL DRL.  
+- `plots_and_metrics`: Analysis outputs.  
+- `train`: DRL utilities.  
+- `train_results`: Trained models.  
+- `models`: `model_rf.pkl`.  
+### Workflow  
+1. **Data**: `0_dl_trainval_data.py`, `0_dl_trade_data.py`  
+2. **Train**: `1_optimize_cpcv.py`, `1_optimize_kcv.py`, `1_optimize_wf.py`, `random_forest.py` (Maxime Grenu’s)  
+3. **Validate**: `2_validate.py`  
+4. **Backtest**: `4_backtest.py`  
+5. **Evaluate**: `5_pbo.py`  
+6. **Live**: `your_bot_script.py`  
+Models saved in `train_results`.  
 
-## Training the Random Forest Model
+## Training the Random Forest  
+`python random_forest.py` (Maxime Grenu’s): Trains, saves `model_rf.pkl`. Adapt for Binance data.  
 
-Before running the bot, you need to train and save a Random Forest model in the file `model_rf.pkl`. You can use the provided `random_forest.py` script to train the model on a sample dataset. For example:
+## Citing  
+@article
+{gort2022deep,
+  title={Deep Reinforcement Learning for Cryptocurrency Trading: Practical Approach to Address Backtest Overfitting},
+  author={Gort, Berend Jelmer Dirk and Liu, Xiao-Yang and Gao, Jiechao and Chen, Shuaiyu and Wang, Christina Dan},
+  journal={AAAI Bridge on AI for Financial Services},
+  year={2023}
+}
+Note: Random Forest HFT adapted from Maxime Grenu’s work.  
 
-    python random_forest.py
+## Limitations and Warnings  
+- **Minimums**: 0.00105 BTC, 100 USDT; adjusted if below.  
+- **Leverage**: 20x default; adjust cautiously.  
+- **Fallbacks**: BUY if low BTC, RSI if HOLD—customize.  
+- **Risks**: High-risk HFT; validate in Testnet.  
 
-This script will display the best hyperparameters, the F1-score, and save the model in `model_rf.pkl`.
+## Merging Process  
+Combines FinRL_Crypto (Gort et al.) DRL/overfitting solutions with Maxime Grenu’s HFT bot/Random Forest, unifying configs (`config_main.py`, `apikeys.txt`, `secrets.txt`), dependencies (`requirements.txt`), and docs.  
 
-## Usage
+## License  
+MIT License. See `LICENSE`.  
 
-To launch the trading bot, simply run the main script:
-
-    python your_bot_script.py
-
-The bot will perform the following operations:
-- Initialize funds: transfer USDT, BTC, and BNB from the Spot account to the Futures account.  
-- Display the current portfolio.  
-- Retrieve the latest price for BTC/USDT and update the price history.  
-- Calculate financial indicators and predict the trading decision using the Random Forest model.  
-- Verify minimum conditions (e.g., sufficient balance to buy at least 0.001 BTC) and execute market orders.
-
-## Limitations and Warnings
-
-- **Minimum Quantities:**  
-  The bot checks that the order quantity is at least equal to the minimum required by Binance (generally 0.001 BTC for BTC/USDT). If this threshold is not met, the order will not be executed.
-
-- **No Leverage:**  
-  This code executes orders without leverage (1x). You can adapt the code if you wish to incorporate leverage, but do so with caution.
-
-- **Decision Fallbacks:**  
-  Fallback mechanisms are in place to force a BUY order if the BTC balance is insufficient for a SELL, or to enforce an order based on RSI in case of a HOLD prediction. Adapt these rules according to your strategy.
-
-- **Financial Risks:**  
-  High-frequency trading on leveraged markets carries significant risks. This project should only be used after thorough validation and a complete understanding of the associated risks.
-
-## Merging Process
-
-This project has been merged with another project focused on model training and evaluation. The integration includes:
-- Consolidation of configuration files to unify settings.
-- Integration of model training scripts into the trading bot's workflow.
-- Unification of dependencies in a single `requirements.txt` file.
-- Resolution of overlapping functionalities and dependencies.
-- Comprehensive documentation updates to reflect the merged project.
-
-## License
-
-This project is distributed under the MIT license. See the LICENSE file for more information.
-
-## Contact
-
-For any questions or suggestions, please open an issue in the repository or contact Maxime Grenu directly.
-
-**Note:** This project is intended for learning and experimentation. The author disclaims any liability for improper use.
+## Contact  
+Open an issue or contact Maxime Grenu (HFT bot) or FinRL_Crypto authors (DRL).  
+**Note:** For learning only. Authors disclaim liability for misuse.
