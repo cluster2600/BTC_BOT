@@ -128,7 +128,8 @@ class BinanceProcessor():
         return final_df
 
     def drop_correlated_features(self, df):
-        corr_matrix = pd.DataFrame(df).corr().abs()
+        numeric_df = df.select_dtypes(include=['float64', 'int64'])  # Select only numeric columns
+corr_matrix = numeric_df.corr().abs()
         upper_tri = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
         to_drop = [column for column in upper_tri.columns if any(upper_tri[column] > self.correlation_threshold)]
 
