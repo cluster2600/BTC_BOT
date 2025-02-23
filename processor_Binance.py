@@ -102,7 +102,7 @@ class BinanceProcessor():
             df = hist_data.iloc[:-1]
             df = df.dropna()
             df['tic'] = i
-            final_df = final_df.append(df)
+            final_df = pd.concat([final_df, df], ignore_index=True)
 
         return final_df
 
