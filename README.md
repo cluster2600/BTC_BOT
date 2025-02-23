@@ -89,12 +89,21 @@ The bot will perform the following operations:
 - **Financial Risks:**  
   High-frequency trading on leveraged markets carries significant risks. This project should only be used after thorough validation and a complete understanding of the associated risks.
 
+## Merging Process
+
+This project has been merged with another project focused on model training and evaluation. The integration includes:
+- Consolidation of configuration files to unify settings.
+- Integration of model training scripts into the trading bot's workflow.
+- Unification of dependencies in a single `requirements.txt` file.
+- Resolution of overlapping functionalities and dependencies.
+- Comprehensive documentation updates to reflect the merged project.
+
 ## License
 
 This project is distributed under the MIT license. See the LICENSE file for more information.
 
 ## Contact
 
-For any questions or suggestions, please open an issue in the repository or contact me directly.
+For any questions or suggestions, please open an issue in the repository or contact Maxime Grenu directly.
 
 **Note:** This project is intended for learning and experimentation. The author disclaims any liability for improper use.
