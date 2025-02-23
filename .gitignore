@@ -7,3 +7,5 @@ venv310/
 .DS_Store # macOS junk file
 data/5m_25000/ # Optional: exclude data folder if large
 train_results/ # Optional: exclude results if large
+__pycache__/
+train_results/ # Optional: remove if you want to track results

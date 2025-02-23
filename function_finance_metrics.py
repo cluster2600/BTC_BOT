@@ -268,7 +268,7 @@ def pct_to_log_return(pct_returns, fillna=True):
     if _is_pandas(pct_returns):
         if fillna:
             pct_returns = pct_returns.fillna(0)
-        return np.log(1 + pct_returns + 1e-8)
+        return np.where(1 + pct_returns > 0, np.log(1 + pct_returns), 0)  # Return 0 for non-positive inputs
     else:
         if fillna:
             pct_returns = np.nan_to_num(pct_returns)
