@@ -7,7 +7,25 @@ venv310/
 .DS_Store # macOS junk file
 data/5m_25000/ # Optional: exclude data folder if large
 train_results/ # Optional: exclude results if large
+<<<<<<< HEAD
 __pycache__/
 train_results/ # Optional: remove if you want to track results
 .env
+
 train_results/*
+train_results/*
+venv310/
+train_results/*.pth
+train_results/*.pkl
+TradingBot_*.log
+__pycache__/*
+*.pyc
+NNModel.mlpackage/
+model_rf.ydf/
+setup_secure_config.sh
+venv_rf/
+your_bot_script.py.bak
+
+
+=======
+>>>>>>> e579a3a (Updated processor_Binance.py, function_CPCV.py, requirements.txt, and added .gitignore to exclude venv310)

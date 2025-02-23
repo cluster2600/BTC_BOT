@@ -238,10 +238,15 @@ def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
     # Compute embargo cutoff time
     embargo_cutoff = last_test_eval_time + cv.embargo_td
     
+<<<<<<< HEAD
     # Ensure cv.pred_times is a Series of Timestamps and compare correctly
     pred_times_series = pd.Series(cv.pred_times.values, index=cv.pred_times.index, dtype='datetime64[ns]')
     embargo_mask = pred_times_series <= embargo_cutoff  # Direct comparison with Series
     
+=======
+    # Compare timestamps correctly (cv.pred_times is a Series of Timestamps)
+    embargo_mask = cv.pred_times <= embargo_cutoff  # Returns a boolean Series
+>>>>>>> e579a3a (Updated processor_Binance.py, function_CPCV.py, requirements.txt, and added .gitignore to exclude venv310)
     min_train_index = embargo_mask.sum()  # Number of True values (length of times <= cutoff)
     
     if min_train_index < cv.indices.shape[0]:
