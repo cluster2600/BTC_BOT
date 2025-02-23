@@ -123,7 +123,7 @@ class BinanceProcessor():
             coin_df = self.get_TALib_features_for_each_coin(coin_df)
 
             # Append constructed tic_df
-            final_df = final_df.append(coin_df)
+            final_df = pd.concat([final_df, coin_df], ignore_index=True)
 
         return final_df
 
