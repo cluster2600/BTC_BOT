@@ -55,8 +55,8 @@ class BaseTimeSeriesCrossValidator:
         if (X.index == eval_times.index).sum() != len(eval_times):
             raise ValueError('X and eval_times must have the same index')
 
-        self.pred_times = pred_times
-        self.eval_times = eval_times
+        self.pred_times = pd.to_datetime(pred_times)  # Ensure pred_times is a Series of Timestamps
+        self.eval_times = pd.to_datetime(eval_times)  # Ensure eval_times is a Series of Timestamps
         self.indices = np.arange(X.shape[0])
 
 
@@ -238,8 +238,9 @@ def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
     # Compute embargo cutoff time
     embargo_cutoff = last_test_eval_time + cv.embargo_td
     
-    # Use pandas Series method for comparison
-    embargo_mask = cv.pred_times.le(embargo_cutoff)  # Returns a boolean Series
+    # Ensure cv.pred_times is a Series of Timestamps and compare correctly
+    pred_times_series = pd.Series(cv.pred_times.values, index=cv.pred_times.index, dtype='datetime64[ns]')
+    embargo_mask = pred_times_series <= embargo_cutoff  # Direct comparison with Series
     
     min_train_index = embargo_mask.sum()  # Number of True values (length of times <= cutoff)
     
