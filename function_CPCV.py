@@ -238,8 +238,9 @@ def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
     # Compute embargo cutoff time
     embargo_cutoff = last_test_eval_time + cv.embargo_td
     
-    # Compare timestamps correctly (cv.pred_times is a Series of Timestamps)
-    embargo_mask = cv.pred_times <= embargo_cutoff  # Returns a boolean Series
+    # Use pandas Series method for comparison
+    embargo_mask = cv.pred_times.le(embargo_cutoff)  # Returns a boolean Series
+    
     min_train_index = embargo_mask.sum()  # Number of True values (length of times <= cutoff)
     
     if min_train_index < cv.indices.shape[0]:
