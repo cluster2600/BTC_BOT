@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Main Trading Bot with Ensemble Model Integration including MLX via LM Studio and Core ML NN,
-Forced Minimum Order Sizes, and Binance Futures Production Support.
+Main Trading Bot with Optimized Strategy and Error Handling for Leverage Issues.
 """
 
 import os
@@ -38,12 +37,28 @@ USE_TESTNET = False
 MLX_SERVER_URL = "http://localhost:1234/v1/completions"
 NN_MODEL_PATH = "/Users/maxime/pump_project/NNModel.mlpackage"
 
+# Trading Parameters
+STOP_LOSS_PCT = 0.015       # 1.5% stop-loss
+TAKE_PROFIT_PCT = 0.03      # 3% take-profit
+ADX_THRESHOLD = 25          # Stronger trend requirement
+CONFIDENCE_THRESHOLD = 0.8  # High confidence for entries
+TAKER_FEE = 0.0006          # 0.06% taker fee
+MAKER_FEE = 0.0002          # 0.02% maker fee
+MIN_USDT = 100.0            # Minimum USDT balance to trade
+MIN_BTC = 0.00105
+TRADE_PERCENTAGE = 0.10     # Default 10% of balance
+HIGH_CONFIDENCE_TRADE_PCT = 0.20  # 20% for high-confidence trades
+COOLDOWN = 300.0            # 5 minutes cooldown
+SLEEP_INTERVAL = 0.5
+FUNDING_CHECK_INTERVAL = 3600  # Check funding fees hourly
+LEVERAGE = 3                # Target leverage
+DEFAULT_LEVERAGE = 1        # Fallback leverage if setting fails
+
 # Logger Setup
 LOG_LEVEL = logging.INFO
 LOG_TO_FILE = True
 
 def setup_logger() -> logging.Logger:
-    """Set up the logger with console and file handlers."""
     logger = logging.getLogger("TradingBot")
     logger.setLevel(LOG_LEVEL)
     logger.propagate = False
@@ -88,7 +103,6 @@ if not all([TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, BINANCE_API_KEY, BINANCE_API_SECRE
 bot = TeleBot(TELEGRAM_TOKEN)
 
 def telegram_notify(message: str, retries: int = 3) -> Optional[Dict[str, Any]]:
-    """Send a notification to Telegram."""
     for attempt in range(retries):
         try:
             url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&parse_mode=Markdown&text={urllib.parse.quote(message)}"
@@ -111,17 +125,23 @@ exchange_futures = ccxt.binance({
     'headers': custom_headers
 })
 
-# Fund Initialization
+# Global State Variables
 initial_futures_balance: Optional[float] = None
-current_position: Optional[float] = None  # BTC held
-entry_price: Optional[float] = None  # Price at which position was opened
+current_position: Optional[float] = None
+entry_price: Optional[float] = None
+previous_position: Optional[float] = None
+last_close_time: float = 0
+last_ohlcv_fetch_time: float = 0
+ohlcv_cache: Optional[pd.DataFrame] = None
+last_funding_check: float = 0
+cumulative_funding_fees: float = 0.0
+current_leverage: int = DEFAULT_LEVERAGE  # Track current leverage
 
 def initialize_funds() -> None:
-    """Initialize funds and set initial balance."""
     global initial_futures_balance, current_position
     try:
         fut_bal = exchange_futures.fetch_balance({'type': 'future'})
-        initial_futures_balance = float(fut_bal.get('USDT', {}).get("free", 0))
+        initial_futures_balance = float(fut_bal.get('USDT', {}).get("total", 0))
         current_position = float(fut_bal.get('BTC', {}).get("free", 0))
         if initial_futures_balance < MIN_USDT:
             print_error(f"Initial Futures USDT balance {initial_futures_balance:.2f} below minimum {MIN_USDT} USDT.")
@@ -131,9 +151,7 @@ def initialize_funds() -> None:
         print_error(f"Error initializing funds: {e}")
         sys.exit(1)
 
-# Portfolio and Profit Display
 def display_portfolio() -> None:
-    """Display current portfolio balances."""
     try:
         bal = exchange_futures.fetch_balance({'type': 'future'})
         usdt = float(bal.get('USDT', {}).get("free", 0))
@@ -143,45 +161,91 @@ def display_portfolio() -> None:
         print_error(f"Error displaying portfolio: {e}")
 
 def display_profit(initial_balance: float) -> None:
-    """Display profit since initialization."""
     try:
         bal = exchange_futures.fetch_balance({'type': 'future'})
-        current_usdt = float(bal.get('USDT', {}).get("free", 0))
-        profit = current_usdt - initial_balance
-        profit_str = f"Profit: {profit:.2f} USDT"
-        print_info(f"[PROFIT] {profit_str}" if profit >= 0 else f"[LOSS] {profit_str}")
+        current_usdt = float(bal.get('USDT', {}).get("total", 0))
+        profit = current_usdt - initial_balance - cumulative_funding_fees
+        profit_str = f"Profit: {profit:.2f} USDT" if profit >= 0 else f"Loss: {profit:.2f} USDT"
+        print_info(f"[OVERALL] {profit_str} (Funding Fees Paid: {cumulative_funding_fees:.2f} USDT)")
     except Exception as e:
         print_error(f"Error displaying profit: {e}")
 
-# Technical Indicators
-def calculate_indicators(prices: List[float]) -> Dict[str, float]:
-    """Calculate technical indicators from price data."""
+def check_funding_fees(symbol: str) -> None:
+    global cumulative_funding_fees, last_funding_check
+    now = time.time()
+    if now - last_funding_check < FUNDING_CHECK_INTERVAL:
+        return
     try:
-        df = pd.DataFrame(prices, columns=['close'])
-        df['rsi'] = ta.momentum.RSIIndicator(df['close'], window=14).rsi()
-        return df.iloc[-1].to_dict()
+        funding_history = exchange_futures.fetch_funding_history(symbol, limit=100)
+        for entry in funding_history:
+            fee = float(entry['info'].get('income', 0))
+            cumulative_funding_fees += fee
+        last_funding_check = now
+        print_info(f"Updated cumulative funding fees: {cumulative_funding_fees:.2f} USDT")
+    except Exception as e:
+        print_error(f"Error fetching funding fees: {e}")
+
+def get_ohlcv(symbol: str, timeframe: str = '1m', limit: int = 200) -> pd.DataFrame:
+    try:
+        ohlcv = exchange_futures.fetch_ohlcv(symbol, timeframe, limit=limit)
+        df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        return df
+    except Exception as e:
+        print_error(f"Error fetching OHLCV: {e}")
+        return pd.DataFrame()
+
+def get_ohlcv_cached(symbol: str, timeframe: str = '1m', limit: int = 200) -> pd.DataFrame:
+    global last_ohlcv_fetch_time, ohlcv_cache
+    now = time.time()
+    if now - last_ohlcv_fetch_time > 60:
+        ohlcv_cache = get_ohlcv(symbol, timeframe, limit)
+        last_ohlcv_fetch_time = now
+    return ohlcv_cache
+
+def calculate_indicators(df: pd.DataFrame) -> Dict[str, float]:
+    try:
+        indicators = {}
+        indicators['rsi'] = ta.momentum.RSIIndicator(df['close'], window=14).rsi().iloc[-1]
+        indicators['sma_20'] = ta.trend.SMAIndicator(df['close'], window=20).sma_indicator().iloc[-1]
+        indicators['sma_200'] = ta.trend.SMAIndicator(df['close'], window=200).sma_indicator().iloc[-1] if len(df) >= 200 else np.nan
+        indicators['atr'] = ta.volatility.AverageTrueRange(df['high'], df['low'], df['close'], window=14).average_true_range().iloc[-1]
+        indicators['adx'] = ta.trend.ADXIndicator(df['high'], df['low'], df['close'], window=14).adx().iloc[-1]
+        return indicators
     except Exception as e:
         print_error(f"Error calculating indicators: {e}")
-        return {'rsi': 0.0}
+        return {'rsi': 0.0, 'sma_20': 0.0, 'sma_200': np.nan, 'atr': 0.0, 'adx': 0.0}
 
-# Order Management
-MIN_USDT = 100.0
-MIN_BTC = 0.00105
-TRADE_PERCENTAGE = 0.10
+def get_current_position(symbol: str) -> float:
+    try:
+        positions = exchange_futures.fetch_positions([symbol])
+        for pos in positions:
+            if pos['symbol'] == symbol and pos['side'] == 'long':
+                return float(pos['contracts'])
+        return 0.0
+    except Exception as e:
+        print_error(f"Error fetching position: {e}")
+        return 0.0
 
 def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price: float) -> Optional[float]:
-    """Adjust quantity to comply with minimums and balance constraints."""
-    global current_position
+    global current_position, current_leverage
     try:
         filters = exchange_futures.markets[symbol]['info'].get('filters', [])
         lot_step = next((float(f.get('stepSize')) for f in filters if f.get('filterType') == 'LOT_SIZE'), 1e-8)
         bal = exchange_futures.fetch_balance({'type': 'future'})
+        free_usdt = float(bal.get('USDT', {}).get("free", 0))
+        if free_usdt < MIN_USDT:
+            print_info(f"Insufficient free USDT balance ({free_usdt:.2f} < {MIN_USDT:.2f}), skipping trade.")
+            return None
+        margin_required = (calculated_qty * current_price) / current_leverage
         if side.upper() == 'BUY':
             final_qty = max(calculated_qty, MIN_USDT / current_price)
-            available_usdt = float(bal.get('USDT', {}).get("free", 0))
-            final_qty = min(final_qty, available_usdt / current_price)
+            if margin_required > free_usdt:
+                final_qty = (free_usdt * current_leverage) / current_price
+                print_info(f"Adjusted quantity to {final_qty:.8f} BTC due to insufficient margin.")
+            final_qty = min(final_qty, free_usdt / current_price)
         elif side.upper() == 'SELL' and current_position > 0:
-            final_qty = min(calculated_qty, current_position)  # Limit to current position
+            final_qty = min(calculated_qty, current_position)
             if final_qty <= 0:
                 print_info(f"Calculated SELL quantity {final_qty} is invalid for {symbol}")
                 return None
@@ -192,32 +256,21 @@ def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price
         print_error(f"Error adjusting quantity: {e}")
         return None
 
-def execute_order(symbol: str, decision: str, final_quantity: float, current_price: float) -> Optional[Dict[str, Any]]:
-    """Execute a market order with reduceOnly for SELL to close positions."""
+def execute_buy_order(symbol: str, final_quantity: float, current_price: float) -> Optional[Dict[str, Any]]:
     global current_position, entry_price
     try:
-        if decision.upper() == "BUY" and (current_position is None or current_position == 0):
-            order = exchange_futures.create_market_buy_order(symbol, final_quantity, params={"reduceOnly": False})
-            current_position = final_quantity
-            entry_price = current_price
-            print_info(f"[TRADE] BUY {final_quantity} units at {current_price} USDT")
-            telegram_notify(f"[TRADE] BUY {final_quantity} units at {current_price} USDT")
-        elif decision.upper() == "SELL" and current_position is not None and current_position > 0:
-            order = exchange_futures.create_market_sell_order(symbol, final_quantity, params={"reduceOnly": True})
-            current_position = 0.0
-            entry_price = None
-            print_info(f"[TRADE] SELL {final_quantity} units at {current_price} USDT")
-            telegram_notify(f"[TRADE] SELL {final_quantity} units at {current_price} USDT")
-        else:
-            print_info(f"No valid position action for {decision} on {symbol}")
-            return None
+        order = exchange_futures.create_limit_buy_order(symbol, final_quantity, current_price, params={"reduceOnly": False})
+        order_info = exchange_futures.fetch_order(order['id'], symbol)
+        current_position = final_quantity
+        entry_price = float(order_info['price']) if order_info['price'] else current_price
+        print_info(f"[TRADE] BUY {final_quantity} units at {entry_price} USDT (Limit Order)")
+        telegram_notify(f"[TRADE] BUY {final_quantity} units at {entry_price} USDT (Limit Order)")
         return order
     except Exception as e:
-        print_error(f"Error executing {decision.upper()} order: {e}")
-        telegram_notify(f"ALERT: Error executing {decision.upper()} order: {e}")
+        print_error(f"Error executing BUY order: {e}")
+        telegram_notify(f"ALERT: Error executing BUY order: {e}")
         return None
 
-# Model Loading
 try:
     ydf_model = load_ydf_model("model_rf.ydf")
     nn_model = ct.models.MLModel(NN_MODEL_PATH)
@@ -227,86 +280,148 @@ except Exception as e:
     print_error(f"Error loading models: {e}")
     sys.exit(1)
 
-# Trading Logic
-historical_prices: Dict[str, List[float]] = {}
-WINDOW_SIZE = 50
-COOLDOWN = 5.0
-SLEEP_INTERVAL = 0.5
-
 def get_latest_price(symbol: str) -> Optional[float]:
-    """Fetch the latest price."""
     try:
         return exchange_futures.fetch_ticker(symbol).get('last')
     except Exception as e:
         print_error(f"Error fetching price: {e}")
         return None
 
-def trading_logic(symbol: str, last_trade_time: Dict[str, float]) -> Dict[str, float]:
-    """Main trading logic with position tracking, RSI, and profit/loss rules."""
-    global current_position, entry_price
+def trading_logic(symbol: str) -> None:
+    global previous_position, last_close_time, current_position, entry_price
+
+    ohlcv = get_ohlcv_cached(symbol)
+    if ohlcv.empty or len(ohlcv) < 200:
+        print_info("Insufficient data for indicators.")
+        return
+
+    indicators = calculate_indicators(ohlcv)
+    if np.isnan(indicators['sma_200']):
+        print_info("SMA_200 not available yet.")
+        return
+
     current_price = get_latest_price(symbol)
     if current_price is None:
-        return last_trade_time
+        return
 
-    if symbol not in historical_prices:
-        historical_prices[symbol] = []
-    historical_prices[symbol].append(current_price)
-    if len(historical_prices[symbol]) > WINDOW_SIZE:
-        historical_prices[symbol].pop(0)
+    current_position = get_current_position(symbol)
+    if current_position > 0 and entry_price is None:
+        positions = exchange_futures.fetch_positions([symbol])
+        for pos in positions:
+            if pos['symbol'] == symbol and pos['side'] == 'long':
+                entry_price = float(pos['entryPrice'])
+                break
+    elif current_position == 0:
+        entry_price = None
 
-    indicators = calculate_indicators(historical_prices[symbol])
-    rsi = indicators.get('rsi', 0.0)
-    print_info(f"[DATA] {symbol} - Price: {current_price:.2f} USDT | RSI: {rsi:.2f}")
+    if previous_position is not None and previous_position > 0 and current_position == 0:
+        last_close_time = time.time()
+        try:
+            trades = exchange_futures.fetch_my_trades(symbol, limit=10)
+            realized_pnl = 0.0
+            for trade in trades[::-1]:
+                if trade['info']['positionSide'] == 'LONG' and trade['info']['side'] == 'SELL':
+                    realized_pnl = float(trade['info'].get('realizedPnl', 0))
+                    break
+            if realized_pnl != 0.0:
+                result_str = f"Profit: {realized_pnl:.2f} USDT" if realized_pnl >= 0 else f"Loss: {realized_pnl:.2f} USDT"
+                print_info(f"[TRADE CLOSED] Position closed. Realized {result_str}")
+                telegram_notify(f"[TRADE CLOSED] Position closed. Realized {result_str}")
+            else:
+                print_info("[TRADE CLOSED] Position closed. No realized PnL found.")
+        except Exception as e:
+            print_error(f"Error fetching realized PnL: {e}")
+            if entry_price:
+                approx_profit = (current_price - entry_price) * previous_position
+                result_str = f"Profit: {approx_profit:.2f} USDT" if approx_profit >= 0 else f"Loss: {approx_profit:.2f} USDT"
+                print_info(f"[TRADE CLOSED] Position closed. Approximate {result_str}")
+                telegram_notify(f"[TRADE CLOSED] Position closed. Approximate {result_str}")
 
-    features = {"price": current_price, "rsi": rsi}  # Simplified for brevity
-    decision = get_ensemble_decision(features, ydf_model, nn_model, mlx_url=MLX_SERVER_URL)
+    # Check market conditions and buying opportunities
+    if current_position == 0 and time.time() - last_close_time > COOLDOWN:
+        if indicators['atr'] > 0.01 * current_price:
+            print_info("High volatility detected (ATR > 1% of price), skipping trade.")
+            return
+        if indicators['adx'] < 15:
+            print_info("Sideways market detected (ADX < 15), pausing trades.")
+            return
 
-    # RSI Thresholds
-    if rsi < 30 and decision != "SELL":
-        decision = "BUY"
-    elif rsi > 70 and decision != "BUY":
-        decision = "SELL"
+        features = {
+            "price": current_price,
+            "rsi": indicators['rsi'],
+            "sma_200": indicators['sma_200'],
+            "sma_20": indicators['sma_20'],
+            "atr": indicators['atr'],
+            "adx": indicators['adx']
+        }
+        decision, confidence = get_ensemble_decision(features, ydf_model, nn_model, mlx_url=MLX_SERVER_URL)
 
-    # Profit-Taking and Stop-Loss
-    if current_position and entry_price:
-        profit_pct = (current_price - entry_price) / entry_price * 100
-        if profit_pct > 2:  # 2% profit
-            decision = "SELL"
-        elif profit_pct < -1:  # 1% loss
-            decision = "SELL"
+        if (current_price > indicators['sma_200'] and
+            current_price > indicators['sma_20'] and
+            indicators['adx'] > ADX_THRESHOLD and
+            decision == "BUY" and
+            confidence > CONFIDENCE_THRESHOLD and
+            indicators['rsi'] < 30):
+            bal = exchange_futures.fetch_balance({'type': 'future'})
+            free_usdt = float(bal.get('USDT', {}).get("free", 0))
+            if free_usdt < MIN_USDT:
+                print_info(f"Free USDT balance too low ({free_usdt:.2f} < {MIN_USDT:.2f}), skipping trade.")
+                return
+            trade_pct = HIGH_CONFIDENCE_TRADE_PCT if confidence > 0.9 else TRADE_PERCENTAGE  # Adjusted to 0.9 for high confidence
+            qty = trade_pct * (free_usdt / current_price)
+            final_qty = adjust_quantity(symbol, "BUY", qty, current_price)
+            if final_qty and final_qty > 0:
+                order = execute_buy_order(symbol, final_qty, current_price)
+                if order:
+                    stop_loss_price = entry_price * (1 - STOP_LOSS_PCT)
+                    take_profit_price = entry_price * (1 + TAKE_PROFIT_PCT)
+                    try:
+                        sl_order = exchange_futures.create_order(
+                            symbol, 'stop', 'sell', current_position,
+                            params={'stopPrice': stop_loss_price, 'reduceOnly': True}
+                        )
+                        tp_order = exchange_futures.create_order(
+                            symbol, 'limit', 'sell', current_position, take_profit_price,
+                            params={'reduceOnly': True}
+                        )
+                        print_info(f"Placed SL order at {stop_loss_price:.2f} USDT and TP order at {take_profit_price:.2f} USDT")
+                    except Exception as e:
+                        print_error(f"Error placing SL/TP orders: {e}")
+                        telegram_notify(f"ALERT: Error placing SL/TP orders: {e}")
 
-    if decision in ["BUY", "SELL"]:
-        now = time.time()
-        if now - last_trade_time.get(symbol, 0) < COOLDOWN:
-            print_info(f"Cooldown active for {symbol}.")
-            return last_trade_time
+    previous_position = current_position
+    check_funding_fees(symbol)
 
-        bal = exchange_futures.fetch_balance({'type': 'future'})
-        qty = TRADE_PERCENTAGE * (float(bal.get('USDT', {}).get("free", 0)) / current_price if decision == "BUY" else current_position if current_position else 0)
-        final_qty = adjust_quantity(symbol, decision, qty, current_price)
-        if final_qty and final_qty > 0:
-            execute_order(symbol, decision, final_qty, current_price)
-            last_trade_time[symbol] = now
-    else:
-        print_info(f"HOLD predicted for {symbol}.")
-    return last_trade_time
-
-# Main Loop
 def main() -> None:
-    """Main trading loop."""
+    global previous_position, last_close_time, current_leverage
     initialize_funds()
     display_portfolio()
     symbol = "BTC/USDT:USDT"
-    last_trade_time = {symbol: 0}
     print_info(f"Starting trading bot for {symbol}...")
-    exchange_futures.set_leverage(20, symbol)
+    try:
+        exchange_futures.set_leverage(LEVERAGE, symbol)
+        current_leverage = LEVERAGE
+        print_info(f"Leverage set to {LEVERAGE}x for {symbol}")
+    except ccxt.OperationRejected as e:
+        print_error(f"Failed to set leverage to {LEVERAGE}x: {str(e)}. Falling back to {DEFAULT_LEVERAGE}x.")
+        current_leverage = DEFAULT_LEVERAGE
+        try:
+            exchange_futures.set_leverage(DEFAULT_LEVERAGE, symbol)
+            print_info(f"Leverage set to {DEFAULT_LEVERAGE}x for {symbol}")
+        except Exception as e:
+            print_error(f"Failed to set fallback leverage: {e}. Continuing with default exchange leverage.")
+    except Exception as e:
+        print_error(f"Unexpected error setting leverage: {e}. Continuing with default exchange leverage.")
+
+    previous_position = current_position
+    last_close_time = 0
 
     initial_balance = initial_futures_balance or 0
     last_profit_time = time.time()
 
     while True:
         try:
-            last_trade_time = trading_logic(symbol, last_trade_time)
+            trading_logic(symbol)
             if time.time() - last_profit_time >= 60:
                 display_profit(initial_balance)
                 last_profit_time = time.time()
