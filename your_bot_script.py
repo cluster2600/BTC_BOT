@@ -361,6 +361,10 @@ def trading_logic(symbol: str, binance_data: pd.DataFrame, yahoo_data: pd.DataFr
             if ind in binance_data.columns:
                 indicators[ind] = float(binance_data[ind].iloc[-1])
                 print_info(f"Overlaid processed {ind}: {indicators[ind]}")
+    # Use dx as ADX if available
+    if 'dx' in indicators:
+        indicators['adx'] = indicators['dx']
+        print_info(f"Using overlaid dx as adx: {indicators['adx']}")
     if np.isnan(indicators['sma_200']):
         print_info("SMA_200 is NaN, skipping trade")
         return
@@ -414,10 +418,9 @@ def trading_logic(symbol: str, binance_data: pd.DataFrame, yahoo_data: pd.DataFr
 
         conditions = {
             "ATR <= 0.01 * Price": indicators['atr'] <= 0.01 * current_price,
-            "ADX > 25": indicators['adx'] > ADX_THRESHOLD,
-            "Price > SMA_200": current_price > indicators['sma_200'],
-            "Price > SMA_20": current_price > indicators['sma_20'],
-            "RSI < 30": indicators['rsi'] < 30  # Relax to < 50 for testing if needed
+            "ADX > 20": indicators['adx'] > 20,
+            "Price > SMA_200 or SMA_20": (current_price > indicators['sma_200']) or (current_price > indicators['sma_20']),
+            "RSI < 70": indicators['rsi'] < 70
         }
         for cond, met in conditions.items():
             print_info(f"{cond}: {'Met' if met else 'Not Met'} (Value: {conditions[cond]})")
@@ -440,10 +443,10 @@ def trading_logic(symbol: str, binance_data: pd.DataFrame, yahoo_data: pd.DataFr
 
         conditions.update({
             "Decision == BUY": decision == "BUY",
-            "Confidence > 0.8": confidence > CONFIDENCE_THRESHOLD
+            "Confidence > 0.7": confidence > 0.7
         })
         print_info(f"Decision == BUY: {'Met' if conditions['Decision == BUY'] else 'Not Met'}")
-        print_info(f"Confidence > 0.8: {'Met' if conditions['Confidence > 0.8'] else 'Not Met'} (Value: {confidence:.4f})")
+        print_info(f"Confidence > 0.7: {'Met' if conditions['Confidence > 0.7'] else 'Not Met'} (Value: {confidence:.4f})")
 
         if all(conditions.values()):
             print_info("All trade conditions met, preparing BUY order")
