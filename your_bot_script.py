@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Main Trading Bot with Ensemble Model Integration including MLX via LM Studio and Core ML NN, Forced Minimum Order Sizes, and Binance Testnet Support
+Main Trading Bot with Ensemble Model Integration including MLX via LM Studio and Core ML NN, Forced Minimum Order Sizes, and Binance Futures Production Support
 
 This module integrates:
   1. An ensemble model combining YDF Random Forest, Core ML NN, and MLX LLM predictions.
   2. Order sizing logic enforcing minimums (100 USDT notional for BUY, 0.00105 BTC and 100 USDT notional for SELL).
   3. Market data ingestion, strategy execution, error logging, and order management.
-  4. Binance Futures Testnet support for safe testing.
+  4. Binance Futures production environment with real trading.
   5. Profit display every minute and Telegram notifications.
-  
+
 Optimized for Mac M1 with Core ML and MLX GPU acceleration.
 """
 
@@ -20,6 +20,7 @@ import math
 import urllib.parse
 from datetime import datetime
 from typing import Any, Dict, Optional, List, Tuple
+import signal
 
 import ccxt
 import numpy as np
@@ -27,21 +28,27 @@ import pandas as pd
 import requests
 import websocket
 import logging
+from logging.handlers import RotatingFileHandler
 import colorlog
 import coremltools as ct
+import ta
+import dotenv
 from telebot import TeleBot, types
 
 # Import ensemble model functions from ensemble_models.py
 from ensemble_models import load_ydf_model, load_mlx_model, get_ensemble_decision
 
-# GLOBAL CONFIGURATION
-TEST_MODE = True        # Set to True to run in simulation mode
-USE_TESTNET = True      # Set to True to use Binance Futures Testnet
-MLX_SERVER_URL = "http://localhost:1234/v1/completions"  # LM Studio server URL
-NN_MODEL_PATH = "NNModel.mlpackage"  # Core ML NN model path (ML Program format)
+# Load environment variables
+dotenv.load_dotenv()
 
-# LOGGER & UTILITY FUNCTIONS
-LOG_LEVEL = logging.DEBUG
+# GLOBAL CONFIGURATION
+TEST_MODE = False       # Disabled for production (real trades)
+USE_TESTNET = False     # Disabled for production (use live Binance Futures)
+MLX_SERVER_URL = "http://localhost:1234/v1/completions"  # LM Studio server URL (ensure running in production)
+NN_MODEL_PATH = "/Users/maxime/pump_project/NNModel.mlpackage"  # Updated absolute path for production
+
+# LOGGER SETUP
+LOG_LEVEL = logging.INFO  # Suitable for production
 LOG_TO_FILE = True
 
 def setup_logger() -> logging.Logger:
@@ -62,11 +69,14 @@ def setup_logger() -> logging.Logger:
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
     if LOG_TO_FILE:
+        current_datetime = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+        file_handler = RotatingFileHandler(
+            f"TradingBot_{current_datetime}.log", maxBytes=10*1024*1024, backupCount=5
+        )
+        file_handler.setLevel(logging.INFO)
         file_formatter = logging.Formatter(
             "%(asctime)s %(levelname)s: %(message)s", datefmt="%d-%m-%Y %H:%M:%S"
         )
-        current_datetime = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
-        file_handler = logging.FileHandler(f"TradingBot_{current_datetime}.log")
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
     return logger
@@ -82,50 +92,38 @@ def print_info(message: str) -> None:
 def debug_log(message: str) -> None:
     log.debug(message)
 
-# CONFIGURATION & SECRETS LOADING
-def read_config(filename: str) -> Dict[str, str]:
-    config: Dict[str, str] = {}
-    try:
-        with open(filename, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    config[key.strip()] = value.strip()
-        debug_log(f"Configuration loaded from {filename}: {list(config.keys())}")
-    except Exception as e:
-        print_error(f"Error reading {filename}: {e}")
-    return config
+# Load environment variables
+BINANCE_API_KEY = os.getenv('BINANCE_API_KEY')
+BINANCE_API_SECRET = os.getenv('BINANCE_API_SECRET')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-secrets = read_config("secrets.txt")
-TELEGRAM_TOKEN = secrets.get("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = secrets.get("TELEGRAM_CHAT_ID")
 if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-    print_error("Missing TELEGRAM_TOKEN or TELEGRAM_CHAT_ID in secrets.txt.")
+    print_error("Missing TELEGRAM_TOKEN or TELEGRAM_CHAT_ID in environment variables.")
     sys.exit(1)
 else:
     print_info("Telegram secrets loaded successfully.")
 
-api_keys = read_config("apikeys.txt")
-BINANCE_API_KEY = api_keys.get("BINANCE_API_KEY")
-BINANCE_API_SECRET = api_keys.get("BINANCE_API_SECRET")
 if not BINANCE_API_KEY or not BINANCE_API_SECRET:
-    print_error("Missing Binance API keys in apikeys.txt.")
+    print_error("Missing Binance API keys in environment variables.")
     sys.exit(1)
 
 # TELEGRAM BOT SETUP
 bot = TeleBot(TELEGRAM_TOKEN)
 
-def telegram_notify(message: str) -> Optional[Dict[str, Any]]:
-    try:
-        url = (f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?"
-               f"chat_id={TELEGRAM_CHAT_ID}&parse_mode=Markdown&text={urllib.parse.quote(message)}")
-        response = requests.get(url)
-        debug_log(f"Telegram response: {response.json()}")
-        return response.json()
-    except Exception as e:
-        print_error(f"Telegram notification error: {e}")
-        return None
+def telegram_notify(message: str, retries: int = 3) -> Optional[Dict[str, Any]]:
+    for attempt in range(retries):
+        try:
+            url = (f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?"
+                   f"chat_id={TELEGRAM_CHAT_ID}&parse_mode=Markdown&text={urllib.parse.quote(message)}")
+            response = requests.get(url, timeout=10)
+            debug_log(f"Telegram response: {response.json()}")
+            return response.json()
+        except Exception as e:
+            print_error(f"Telegram error (attempt {attempt + 1}/{retries}): {e}")
+            time.sleep(5)
+    print_error(f"Failed to send Telegram notification after {retries} attempts: {message}")
+    return None
 
 # BINANCE EXCHANGE INSTANCES
 custom_headers = {
@@ -133,56 +131,29 @@ custom_headers = {
     'X-MBX-APIKEY': BINANCE_API_KEY,
 }
 
-if not TEST_MODE:
-    exchange_spot = ccxt.binance({
-        'apiKey': BINANCE_API_KEY,
-        'secret': BINANCE_API_SECRET,
-        'enableRateLimit': True,
-        'headers': custom_headers,
-    })
-else:
-    class DummyExchange:
-        def __init__(self):
-            self._markets = {
-                "BTC/USDT:USDT": {"info": {"filters": [{"filterType": "LOT_SIZE", "stepSize": "0.00000001"}]}}
-            }
-        @property
-        def markets(self):
-            return self._markets
-        def fetch_balance(self, params=None):
-            return {'USDT': {'free': 412.22}, 'BTC': {'free': 0.00218558}, 'BNB': {'free': 0.00004510}}
-        def load_markets(self):
-            return self._markets
-        def fetch_ticker(self, symbol):
-            return {"last": 96000.0}
-        def create_market_buy_order(self, symbol, quantity, params):
-            return {"id": "test_buy", "symbol": symbol, "quantity": quantity}
-        def create_market_sell_order(self, symbol, quantity, params):
-            return {"id": "test_sell", "symbol": symbol, "quantity": quantity}
-        def transfer(self, asset, amount, from_account, to_account):
-            return {"status": "ok"}
-        def set_leverage(self, leverage, symbol):
-            return {"status": "ok"}
-    exchange_spot = DummyExchange()
+exchange_spot = ccxt.binance({
+    'apiKey': BINANCE_API_KEY,
+    'secret': BINANCE_API_SECRET,
+    'enableRateLimit': True,
+    'headers': custom_headers,
+})
 
-if not TEST_MODE:
-    futures_config = {
-        'apiKey': BINANCE_API_KEY,
-        'secret': BINANCE_API_SECRET,
-        'enableRateLimit': True,
-        'options': {'defaultType': 'future'},
-        'urls': {
-            'api': {
-                'public': 'https://testnet.binancefuture.com/fapi/v1' if USE_TESTNET else 'https://fapi.binance.com/fapi/v1',
-                'private': 'https://testnet.binancefuture.com/fapi/v1' if USE_TESTNET else 'https://fapi.binance.com/fapi/v1'
-            }
-        },
-        'headers': custom_headers,
-    }
-    exchange_futures = ccxt.binance(futures_config)
-    print_info("Testnet mode activated for Futures." if USE_TESTNET else "Production mode activated for Futures.")
-else:
-    exchange_futures = exchange_spot
+futures_config = {
+    'apiKey': BINANCE_API_KEY,
+    'secret': BINANCE_API_SECRET,
+    'enableRateLimit': True,
+    'rateLimit': 1200,  # Matches Binance Futures limits
+    'options': {'defaultType': 'future'},
+    'urls': {
+        'api': {
+            'public': 'https://fapi.binance.com/fapi/v1',
+            'private': 'https://fapi.binance.com/fapi/v1'
+        }
+    },
+    'headers': custom_headers,
+}
+exchange_futures = ccxt.binance(futures_config)
+print_info("Production mode activated for Binance Futures.")
 
 # FUND TRANSFER & INITIALIZATION FUNCTIONS
 initial_futures_balance: Optional[float] = None
@@ -191,14 +162,16 @@ def transfer_funds_spot_to_futures() -> None:
     try:
         bal = exchange_spot.fetch_balance({'type': 'spot'})
         usdt_spot = float(bal.get('USDT', {}).get('free', 0))
-        if usdt_spot > 0:
+        if usdt_spot > 10:  # Minimum 10 USDT
             print_info(f"Transferring {usdt_spot} USDT from Spot to Futures.")
             result = exchange_futures.transfer('USDT', usdt_spot, 'spot', 'future')
             print_info(f"Transfer result: {result}")
+            time.sleep(2)  # Delay to ensure transfer completes
         else:
-            print_info("No USDT available on Spot to transfer.")
+            print_info("Spot USDT below threshold; no transfer.")
     except Exception as e:
         print_error(f"Error transferring funds: {e}")
+        telegram_notify(f"ALERT: Fund transfer failed: {e}")
 
 def initialize_funds() -> None:
     global initial_futures_balance
@@ -206,9 +179,14 @@ def initialize_funds() -> None:
     try:
         fut_bal = exchange_futures.fetch_balance({'type': 'future'})
         initial_futures_balance = float(fut_bal.get('USDT', {}).get("free", 0))
+        if initial_futures_balance < MIN_USDT:
+            print_error(f"Initial Futures USDT balance {initial_futures_balance:.2f} is below minimum {MIN_USDT} USDT.")
+            telegram_notify(f"ALERT: Insufficient initial balance: {initial_futures_balance:.2f} USDT")
+            sys.exit(1)
         print_info(f"Initial Futures USDT balance: {initial_futures_balance:.2f}")
     except Exception as e:
         print_error(f"Error initializing funds: {e}")
+        sys.exit(1)
 
 # DISPLAY PORTFOLIO & PROFIT
 def display_portfolio() -> None:
@@ -220,6 +198,7 @@ def display_portfolio() -> None:
         print_info(f"[PORTFOLIO] Current balances:\n  USDT: {usdt:.8f}\n  BTC: {btc:.8f}\n  BNB: {bnb:.8f}")
     except Exception as e:
         print_error(f"Error displaying portfolio: {e}")
+        telegram_notify(f"ALERT: Failed to fetch portfolio: {e}")
 
 def display_profit(initial_balance: float) -> None:
     try:
@@ -231,55 +210,29 @@ def display_profit(initial_balance: float) -> None:
             print_info(f"[PROFIT] {profit_str}")
         else:
             print_error(f"[PROFIT] {profit_str}")
+            telegram_notify(f"WARNING: Negative profit: {profit_str}")
     except Exception as e:
         print_error(f"Error displaying profit: {e}")
 
 # TECHNICAL INDICATOR FUNCTIONS
-def calculate_ema(prices: List[float], period: int) -> float:
-    alpha = 2 / (period + 1)
-    ema = prices[0]
-    for price in prices[1:]:
-        ema = alpha * price + (1 - alpha) * ema
-    return ema
-
-def calculate_rsi(prices: List[float], period: int = 14) -> Optional[float]:
-    if len(prices) < period + 1:
-        return None
-    deltas = np.diff(prices)
-    gains = np.maximum(deltas, 0)
-    losses = np.abs(np.minimum(deltas, 0))
-    avg_gain = np.mean(gains[-period:])
-    avg_loss = np.mean(losses[-period:])
-    if avg_loss == 0:
-        return 100.0
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
-
-def calculate_macd(prices: List[float], fast: int = 12, slow: int = 26, signal: int = 9) -> Tuple[Optional[float], Optional[float], Optional[float]]:
-    if len(prices) < slow + signal - 1:
-        return None, None, None
-    ema_fast = calculate_ema(prices[-fast:], fast)
-    ema_slow = calculate_ema(prices[-slow:], slow)
-    macd_line = ema_fast - ema_slow
-    macd_series = [
-        calculate_ema(prices[i-fast:i], fast) - calculate_ema(prices[i-slow:i], slow)
-        for i in range(slow, len(prices))
-    ]
-    signal_line = calculate_ema(macd_series[-signal:], signal)
-    return macd_line, signal_line, macd_line - signal_line
-
-def calculate_bbands(prices: List[float], period: int = 50, num_std: int = 2) -> Tuple[Optional[float], Optional[float], Optional[float]]:
-    if len(prices) < period:
-        return None, None, None
-    window = prices[-period:]
-    sma = np.mean(window)
-    std = np.std(window)
-    return sma - num_std * std, sma, sma + num_std * std
+def calculate_indicators(prices: List[float]) -> Dict[str, float]:
+    try:
+        df = pd.DataFrame(prices, columns=['close'])
+        df['rsi'] = ta.momentum.RSIIndicator(df['close'], window=14).rsi()
+        df['macd'] = ta.trend.MACD(df['close']).macd()
+        df['signal_line'] = ta.trend.MACD(df['close']).macd_signal()
+        df['bb_lower'] = ta.volatility.BollingerBands(df['close']).bollinger_lband()
+        df['bb_upper'] = ta.volatility.BollingerBands(df['close']).bollinger_hband()
+        return df.iloc[-1].to_dict()
+    except Exception as e:
+        print_error(f"Error calculating indicators: {e}")
+        return {'rsi': None, 'macd': None, 'signal_line': None, 'bb_lower': None, 'bb_upper': None}
 
 # ORDER SIZE & QUANTITY ADJUSTMENT
 MIN_USDT = 100.0      # Minimum notional for BUY orders
 MIN_BTC = 0.00105     # Minimum BTC quantity for SELL orders
-TRADE_PERCENTAGE = 0.10
+TRADE_PERCENTAGE = 0.10  # 10% of available balance per trade
+MAX_TRADE_PERCENTAGE = 0.25  # Cap at 25% of balance
 
 def adjust_lot_size(symbol: str, quantity: float) -> float:
     try:
@@ -317,6 +270,8 @@ def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price
             forced_qty_buy = math.ceil((MIN_USDT / current_price) / lot_step) * lot_step
             final_qty = max(calculated_qty, forced_qty_buy)
             available_usdt = float(bal.get('USDT', {}).get("free", 0))
+            max_qty = (MAX_TRADE_PERCENTAGE * available_usdt) / current_price
+            final_qty = min(final_qty, max_qty)
             if current_price * final_qty > available_usdt:
                 final_qty = available_usdt / current_price
         elif side.upper() == 'SELL':
@@ -327,6 +282,7 @@ def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price
             final_qty = max(calculated_qty, forced_qty)
             base_asset = symbol.split("/")[0]
             available_asset = float(bal.get(base_asset, {}).get("free", 0))
+            final_qty = min(final_qty, available_asset * MAX_TRADE_PERCENTAGE)
             if final_qty > available_asset:
                 final_qty = available_asset
         else:
@@ -359,14 +315,12 @@ def execute_order(symbol: str, decision: str, final_quantity: float, current_pri
             additional_qty = math.ceil(((MIN_USDT / current_price) - final_quantity) / lot_step) * lot_step
             final_quantity += additional_qty
 
-    if TEST_MODE:
-        print_info(f"TEST MODE: Simulated {decision.upper()} order on {symbol}: {final_quantity} units at {current_price} USDT.")
-        return {"id": f"test_{decision.lower()}", "symbol": symbol, "quantity": final_quantity}
     try:
         order = (exchange_futures.create_market_buy_order(symbol, final_quantity, params={"reduceOnly": False})
                  if decision.upper() == "BUY" else
                  exchange_futures.create_market_sell_order(symbol, final_quantity, params={"reduceOnly": False}))
         print_info(f"[TRADE] {decision.upper()} order executed on {symbol}: {final_quantity} units at {current_price} USDT.\nOrder result: {order}")
+        telegram_notify(f"[TRADE] {decision.upper()} order on {symbol}: {final_quantity} units at {current_price} USDT")
         return order
     except Exception as e:
         print_error(f"Error executing {decision.upper()} order on {symbol}: {e}")
@@ -374,61 +328,69 @@ def execute_order(symbol: str, decision: str, final_quantity: float, current_pri
         return None
 
 # ENSEMBLE MODEL INTEGRATION
+def load_mlx_model():
+    try:
+        response = requests.get("http://localhost:1234/v1/models", timeout=5)
+        response.raise_for_status()
+        print_info("MLX model loaded via LM Studio at http://localhost:1234")
+    except Exception as e:
+        raise RuntimeError(f"Failed to connect to LM Studio server: {e}")
+
 try:
     ydf_model = load_ydf_model("model_rf.ydf")
-    nn_model = ct.models.MLModel(NN_MODEL_PATH)  # Load Core ML ML Program model
-    load_mlx_model()  # Confirm LM Studio connection
+    nn_model = ct.models.MLModel(NN_MODEL_PATH)
+    load_mlx_model()  # Ensure LM Studio is running in production
     print_info("All ensemble models (YDF, Core ML NN, MLX via LM Studio) loaded successfully.")
 except Exception as e:
     print_error(f"Error loading ensemble models: {e}")
+    telegram_notify(f"ALERT: Failed to load ensemble models: {e}")
     sys.exit(1)
 
-def predict_decision(symbol: str, current_price: float, moving_average: float,
-                     rsi: Optional[float], macd: Optional[float],
-                     signal_line: Optional[float], bbands: Tuple[Optional[float], Optional[float], Optional[float]]) -> str:
-    lower_bb, sma_bb, upper_bb = bbands if bbands is not None else (0.0, 0.0, 0.0)
-    lower_bb = lower_bb or 0.0
-    sma_bb = sma_bb or 0.0
-    upper_bb = upper_bb or 0.0
-
+def predict_decision(symbol: str, current_price: float, indicators: Dict[str, float]) -> str:
     features = {
         "price": current_price,
         "Order_Amount": 0.0,
-        "sma": moving_average,
+        "sma": indicators.get('close', current_price),  # Using last close as proxy for SMA
         "Filled": 0.0,
         "Total": 0.0,
         "future_price": current_price,
         "atr": 0.0,
         "vol_adjusted_price": current_price,
         "volume_ma": 0.0,
-        "macd": macd or 0.0,
-        "signal_line": signal_line or 0.0,
-        "lower_bb": lower_bb,
-        "sma_bb": sma_bb,
-        "upper_bb": upper_bb,
+        "macd": indicators.get('macd', 0.0) or 0.0,
+        "signal_line": indicators.get('signal_line', 0.0) or 0.0,
+        "lower_bb": indicators.get('bb_lower', 0.0) or 0.0,
+        "sma_bb": indicators.get('close', current_price),  # Proxy for SMA
+        "upper_bb": indicators.get('bb_upper', 0.0) or 0.0,
         "news_sentiment": 0.0,
         "social_feature": 0.0,
         "adx": 0.0,
-        "rsi": rsi or 0.0,
+        "rsi": indicators.get('rsi', 0.0) or 0.0,
         "order_book_depth": 0.0,
         "volume": 0.0
     }
     debug_log(f"Features for {symbol}: {features}")
-    ensemble_decision = get_ensemble_decision(features, ydf_model, nn_model, mlx_url=MLX_SERVER_URL)
-    if ensemble_decision != "HOLD":
-        return ensemble_decision
-    if rsi is not None:
-        if rsi < 40:
-            return "BUY"
-        elif rsi > 60:
-            return "SELL"
-    return "HOLD"
+    try:
+        ensemble_decision = get_ensemble_decision(features, ydf_model, nn_model, mlx_url=MLX_SERVER_URL)
+        if ensemble_decision != "HOLD":
+            return ensemble_decision
+        rsi = indicators.get('rsi')
+        if rsi is not None:
+            if rsi < 40:
+                return "BUY"
+            elif rsi > 60:
+                return "SELL"
+        return "HOLD"
+    except Exception as e:
+        print_error(f"Error predicting decision for {symbol}: {e}")
+        return "HOLD"  # Fallback to HOLD on prediction failure
 
 # TRADING LOGIC LOOP
 historical_prices: Dict[str, List[float]] = {}
 WINDOW_SIZE = 50
-COOLDOWN = 0.2
-SLEEP_INTERVAL = 0.1
+COOLDOWN = 5.0  # Increased to 5 seconds for production to avoid over-trading
+SLEEP_INTERVAL = 0.5  # Increased to 0.5 seconds for stability
+SLIPPAGE_TOLERANCE = 0.001  # 0.1% slippage tolerance
 
 def get_latest_price(symbol: str) -> Optional[float]:
     try:
@@ -441,6 +403,7 @@ def get_latest_price(symbol: str) -> Optional[float]:
 def trading_logic(symbol: str, last_trade_time: Dict[str, float]) -> Dict[str, float]:
     current_price = get_latest_price(symbol)
     if current_price is None:
+        print_error(f"Price fetch failed for {symbol}. Skipping trade.")
         return last_trade_time
 
     if symbol not in historical_prices:
@@ -449,14 +412,12 @@ def trading_logic(symbol: str, last_trade_time: Dict[str, float]) -> Dict[str, f
     if len(historical_prices[symbol]) > WINDOW_SIZE:
         historical_prices[symbol].pop(0)
 
-    moving_average = np.mean(historical_prices[symbol])
-    rsi = calculate_rsi(historical_prices[symbol])
-    macd, signal_line, _ = calculate_macd(historical_prices[symbol])
-    bbands = calculate_bbands(historical_prices[symbol])
+    indicators = calculate_indicators(historical_prices[symbol])
+    rsi = indicators.get('rsi')
     rsi_disp = f"{rsi:.2f}" if rsi is not None else "N/A"
-    print_info(f"[DATA] {symbol} - Price: {current_price:.2f} USDT | SMA: {moving_average:.2f} | RSI: {rsi_disp}")
+    print_info(f"[DATA] {symbol} - Price: {current_price:.2f} USDT | RSI: {rsi_disp}")
 
-    decision = predict_decision(symbol, current_price, moving_average, rsi, macd, signal_line, bbands)
+    decision = predict_decision(symbol, current_price, indicators)
     print_info(f"Predicted decision for {symbol}: {decision}")
 
     if decision.upper() in ["BUY", "SELL"]:
@@ -465,12 +426,13 @@ def trading_logic(symbol: str, last_trade_time: Dict[str, float]) -> Dict[str, f
             print_info(f"Cooldown active for {symbol}. No trade executed.")
             return last_trade_time
 
-        base_qty = calculate_dynamic_quantity(symbol, decision, current_price)
+        price_with_slippage = current_price * (1 + SLIPPAGE_TOLERANCE if decision.upper() == "BUY" else 1 - SLIPPAGE_TOLERANCE)
+        base_qty = calculate_dynamic_quantity(symbol, decision, price_with_slippage)
         if base_qty is None or base_qty <= 0:
             print_info(f"Calculated quantity is 0 for {symbol} {decision}. No trade executed.")
             return last_trade_time
 
-        final_quantity = adjust_quantity(symbol, decision, base_qty, current_price)
+        final_quantity = adjust_quantity(symbol, decision, base_qty, price_with_slippage)
         if final_quantity is None or final_quantity <= 0:
             print_info(f"Final quantity is 0 for {symbol} {decision}. No trade executed.")
             return last_trade_time
@@ -479,16 +441,15 @@ def trading_logic(symbol: str, last_trade_time: Dict[str, float]) -> Dict[str, f
         if decision.upper() == "SELL" and final_quantity > float(bal.get('BTC', {}).get("free", 0)):
             print_info(f"Insufficient BTC for SELL on {symbol}. No trade executed.")
             return last_trade_time
-        elif decision.upper() == "BUY" and final_quantity * current_price > float(bal.get('USDT', {}).get("free", 0)):
+        elif decision.upper() == "BUY" and final_quantity * price_with_slippage > float(bal.get('USDT', {}).get("free", 0)):
             print_info(f"Insufficient USDT for BUY on {symbol}. No trade executed.")
             return last_trade_time
 
-        debug_log(f"Final order notional: {current_price * final_quantity:.2f} USDT")
-        order = execute_order(symbol, decision, final_quantity, current_price)
+        debug_log(f"Final order notional: {price_with_slippage * final_quantity:.2f} USDT")
+        order = execute_order(symbol, decision, final_quantity, price_with_slippage)
         if order is not None:
             print_info(f"Order executed on {symbol}.")
             last_trade_time[symbol] = now
-            telegram_notify(f"[TRADE] {decision.upper()} order on {symbol}: {final_quantity} units at {current_price} USDT.")
     else:
         print_info(f"Model predicted HOLD for {symbol}. No trade executed.")
     return last_trade_time
@@ -502,10 +463,11 @@ def main() -> None:
         markets = exchange_futures.load_markets()
     except Exception as e:
         print_error(f"Error loading markets: {e}")
+        telegram_notify(f"ALERT: Failed to load markets: {e}")
         sys.exit(1)
-    symbol = next((s for s in ["BTC/USDT:USDT", "BTC/USDT", "BTCUSDT"] if s in markets), None)
+    symbol = next((s for s in ["BTC/USDT:USDT", "BTC/USDT"] if s in markets), None)
     if not symbol:
-        print_error(f"Symbol 'BTC/USDT' or 'BTCUSDT' not found. Available symbols: {list(markets.keys())}")
+        print_error(f"Symbol 'BTC/USDT' not found. Available symbols: {list(markets.keys())}")
         sys.exit(1)
     print_info(f"Using trading symbol: {symbol}")
     historical_prices[symbol] = []
@@ -518,17 +480,23 @@ def main() -> None:
         print_info(f"Leverage set to {LEVERAGE} for {symbol}.")
     except Exception as e:
         print_error(f"Error setting leverage for {symbol}: {e}")
+        telegram_notify(f"ALERT: Leverage setting failed: {e}")
 
     initial_balance = initial_futures_balance if initial_futures_balance is not None else 0
     last_profit_display_time = time.time()
 
     while True:
-        last_trade_time = trading_logic(symbol, last_trade_time)
-        current_time = time.time()
-        if current_time - last_profit_display_time >= 60:
-            display_profit(initial_balance)
-            last_profit_display_time = current_time
-        time.sleep(SLEEP_INTERVAL)
+        try:
+            last_trade_time = trading_logic(symbol, last_trade_time)
+            current_time = time.time()
+            if current_time - last_profit_display_time >= 60:
+                display_profit(initial_balance)
+                last_profit_display_time = current_time
+            time.sleep(SLEEP_INTERVAL)
+        except Exception as e:
+            print_error(f"Unexpected error in trading loop: {e}")
+            telegram_notify(f"ALERT: Trading loop crashed: {e}")
+            time.sleep(60)  # Wait before retrying
 
 # TELEGRAM COMMANDS
 @bot.message_handler(commands=['shutdown'])
@@ -561,14 +529,23 @@ def shutdown_bot() -> None:
     telegram_notify("Bot is shutting down.")
     sys.exit("BOT SHUTDOWN")
 
+def handle_signal(signum, frame):
+    print_info("Received shutdown signal.")
+    shutdown_bot()
+
+signal.signal(signal.SIGINT, handle_signal)
+signal.signal(signal.SIGTERM, handle_signal)
+
 # WEBSOCKET INTEGRATION
 def on_open(ws: websocket.WebSocketApp) -> None:
     print_info("WebSocket connection opened.")
     telegram_notify("WebSocket connection opened.")
 
-def on_close(ws: websocket.WebSocketApp) -> None:
-    print_info("WebSocket connection closed.")
-    telegram_notify("WebSocket connection closed.")
+def on_close(ws: websocket.WebSocketApp, close_status_code, close_msg) -> None:
+    print_info("WebSocket connection closed. Reconnecting...")
+    telegram_notify("WebSocket connection closed. Reconnecting...")
+    time.sleep(5)
+    start_websocket()
 
 def on_message(ws: websocket.WebSocketApp, message: str) -> None:
     global symbol
@@ -586,7 +563,7 @@ def on_message(ws: websocket.WebSocketApp, message: str) -> None:
         print_error(f"Error processing WebSocket message: {e}")
 
 def start_websocket() -> None:
-    ws_url = "wss://stream.binance.com:9443/ws/btcusdt@kline_1m"
+    ws_url = "wss://fstream.binance.com/ws/btcusdt@kline_1m"  # Production Futures WebSocket
     ws = websocket.WebSocketApp(ws_url, on_open=on_open, on_close=on_close, on_message=on_message)
     ws.run_forever()
 
