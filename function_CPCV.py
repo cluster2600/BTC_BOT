@@ -55,8 +55,8 @@ class BaseTimeSeriesCrossValidator:
         if (X.index == eval_times.index).sum() != len(eval_times):
             raise ValueError('X and eval_times must have the same index')
 
-        self.pred_times = pd.to_datetime(pred_times)  # Ensure pred_times is a Series of Timestamps
-        self.eval_times = pd.to_datetime(eval_times)  # Ensure eval_times is a Series of Timestamps
+        self.pred_times = pred_times
+        self.eval_times = eval_times
         self.indices = np.arange(X.shape[0])
 
 
@@ -127,13 +127,13 @@ class CombPurgedKFoldCV(BaseTimeSeriesCrossValidator):
         fold_bounds = [(fold[0], fold[-1] + 1) for fold in np.array_split(self.indices, self.n_splits)]
         # List of all combinations of n_test_splits folds selected to become test sets
         selected_fold_bounds = list(itt.combinations(fold_bounds, self.n_test_splits))
-        # Reverse to prioritize test sets at the end of the dataset
+        # In order for the first round to have its whole test set at the end of the dataset
         selected_fold_bounds.reverse()
 
         for fold_bound_list in selected_fold_bounds:
-            # Compute the bounds of the test set and corresponding indices
+            # Computes the bounds of the test set, and the corresponding indices
             test_fold_bounds, test_indices = self.compute_test_set(fold_bound_list)
-            # Compute the train set indices
+            # Computes the train set indices
             train_indices = self.compute_train_set(test_fold_bounds, test_indices)
 
             yield train_indices, test_indices
@@ -152,9 +152,13 @@ class CombPurgedKFoldCV(BaseTimeSeriesCrossValidator):
         train_indices: np.ndarray
             A numpy array containing all the indices in the train set.
         """
+        # As a first approximation, the train set is the complement of the test set
         train_indices = np.setdiff1d(self.indices, test_indices)
+        # But we now have to purge and embargo
         for test_fold_start, test_fold_end in test_fold_bounds:
+            # Purge
             train_indices = purge(self, train_indices, test_fold_start, test_fold_end)
+            # Embargo
             train_indices = embargo(self, train_indices, test_indices, test_fold_end)
         return train_indices
 
@@ -172,11 +176,13 @@ class CombPurgedKFoldCV(BaseTimeSeriesCrossValidator):
         test_indices: np.ndarray
             A numpy array containing the test indices.
         """
-        test_indices = np.empty(0, dtype=int)
+        test_indices = np.empty(0)
         test_fold_bounds = []
         for fold_start, fold_end in fold_bound_list:
+            # Records the boundaries of the current test split
             if not test_fold_bounds or fold_start != test_fold_bounds[-1][-1]:
                 test_fold_bounds.append((fold_start, fold_end))
+            # If the current test split is contiguous to the previous one, simply updates the endpoint
             elif fold_start == test_fold_bounds[-1][-1]:
                 test_fold_bounds[-1] = (test_fold_bounds[-1][0], fold_end)
             test_indices = np.union1d(test_indices, self.indices[fold_start:fold_end]).astype(int)
@@ -206,52 +212,40 @@ def compute_fold_bounds(cv: BaseTimeSeriesCrossValidator, split_by_time: bool) -
 def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
             test_indices: np.ndarray, test_fold_end: int) -> np.ndarray:
     """
-    Apply the embargo procedure to part of the train set.
-    This drops train set samples whose prediction time occurs within self.embargo_td of the test set evaluation times.
-    Parameters
-    ----------
-    cv: Cross-validation class
-        Needs attributes cv.pred_times, cv.eval_times, cv.embargo_td, and cv.indices.
-    train_indices: np.ndarray
-        Indices of samples currently in the train set.
-    test_indices : np.ndarray
-        Indices of samples in the test set.
-    test_fold_end : int
-        Index corresponding to the end of a test set block.
-    Returns
-    -------
-    train_indices: np.ndarray
-        Train indices with embargoed samples removed.
+    Adjusts training indices to enforce an embargo period after the test fold.
+
+    Args:
+        cv: The cross-validator instance with attributes like eval_times, pred_times, embargo_td.
+        train_indices: Initial training indices.
+        test_indices: Test indices for the current fold.
+        test_fold_end: The end index of the test fold.
+
+    Returns:
+        Adjusted training indices enforcing the embargo.
     """
     if not hasattr(cv, 'embargo_td'):
         raise ValueError("The passed cross-validation object should have a member cv.embargo_td defining the embargo time.")
     
-    # Get the latest evaluation time from the test set up to test_fold_end
+    # Get the maximum evaluation time from the test indices
     last_test_eval_time = cv.eval_times.iloc[test_indices[test_indices <= test_fold_end]].max()
     
-    # Ensure last_test_eval_time is a Timestamp
-    if isinstance(last_test_eval_time, (int, np.integer)):
-        last_test_eval_time = pd.Timestamp.fromtimestamp(last_test_eval_time / 1000)  # Convert ms Unix timestamp to seconds
-    elif not isinstance(last_test_eval_time, pd.Timestamp):
-        last_test_eval_time = pd.Timestamp(last_test_eval_time)
-
-    # Compute embargo cutoff time
-    embargo_cutoff = last_test_eval_time + cv.embargo_td
+    # Convert last_test_eval_time from integer (nanoseconds) to pd.Timestamp
+    last_test_eval_time_ts = pd.Timestamp(last_test_eval_time, unit='ns')
     
-<<<<<<< HEAD
-    # Ensure cv.pred_times is a Series of Timestamps and compare correctly
-    pred_times_series = pd.Series(cv.pred_times.values, index=cv.pred_times.index, dtype='datetime64[ns]')
-    embargo_mask = pred_times_series <= embargo_cutoff  # Direct comparison with Series
+    # Add embargo_td to the Timestamp
+    embargo_time_ts = last_test_eval_time_ts + cv.embargo_td
     
-=======
-    # Compare timestamps correctly (cv.pred_times is a Series of Timestamps)
-    embargo_mask = cv.pred_times <= embargo_cutoff  # Returns a boolean Series
->>>>>>> e579a3a (Updated processor_Binance.py, function_CPCV.py, requirements.txt, and added .gitignore to exclude venv310)
-    min_train_index = embargo_mask.sum()  # Number of True values (length of times <= cutoff)
+    # Convert back to integer nanoseconds
+    embargo_time_ns = embargo_time_ts.value
     
+    # Determine the minimum index for training data after the embargo
+    min_train_index = len(cv.pred_times[cv.pred_times <= embargo_time_ns])
+    
+    # Adjust training indices if necessary
     if min_train_index < cv.indices.shape[0]:
         allowed_indices = np.concatenate((cv.indices[:test_fold_end], cv.indices[min_train_index:]))
         train_indices = np.intersect1d(train_indices, allowed_indices)
+    
     return train_indices
 
 
@@ -259,34 +253,38 @@ def purge(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
           test_fold_start: int, test_fold_end: int) -> np.ndarray:
     """
     Purge part of the train set.
-    Removes train samples whose evaluation time is after the prediction time of the first test sample.
+    Given a left boundary index test_fold_start of the test set, this method removes from the train set all the
+    samples whose evaluation time is posterior to the prediction time of the first test sample after the boundary.
     Parameters
     ----------
     cv: Cross-validation class
-        Needs attributes cv.pred_times, cv.eval_times, and cv.indices.
+        Needs to have the attributes cv.pred_times, cv.eval_times and cv.indices.
     train_indices: np.ndarray
-        Indices of samples currently in the train set.
+        A numpy array containing all the indices of the samples currently included in the train set.
     test_fold_start : int
-        Index marking the start of a test set block.
+        Index corresponding to the start of a test set block.
     test_fold_end : int
-        Index marking the end of the same test set block.
+        Index corresponding to the end of the same test set block.
     Returns
     -------
     train_indices: np.ndarray
-        Train indices purged at test_fold_start.
+        A numpy array containing the train indices purged at test_fold_start.
     """
     time_test_fold_start = cv.pred_times.iloc[test_fold_start]
+    # The train indices before the start of the test fold, purged.
     train_indices_1 = np.intersect1d(train_indices, cv.indices[cv.eval_times < time_test_fold_start])
+    # The train indices after the end of the test fold.
     train_indices_2 = np.intersect1d(train_indices, cv.indices[test_fold_end:])
     return np.concatenate((train_indices_1, train_indices_2))
 
 
 def back_test_paths_generator(X, y, cv, t_span, n, k, prediction_times, evaluation_times, verbose=True):
-    # Split data into N groups, with N << T
+    # split data into N groups, with N << T
+    # this will assign each index position to a group position
     group_num = np.arange(t_span) // (t_span // n)
     group_num[group_num == n] = n - 1
 
-    # Generate combinations
+    # generate the combinations
     test_groups = np.array(list(itt.combinations(np.arange(n), k))).reshape(-1, k)
     C_nk = len(test_groups)
     n_paths = C_nk * k // n
@@ -295,19 +293,24 @@ def back_test_paths_generator(X, y, cv, t_span, n, k, prediction_times, evaluati
         print('n_sim:', C_nk)
         print('n_paths:', n_paths)
 
-    # is_test is a T x C(n, k) array where each column indicates test set observations
+    # is_test is a T x C(n, k) array where each column is a logical array
+    # indicating which observation in in the test set
     is_test_group = np.full((n, C_nk), fill_value=False)
     is_test = np.full((t_span, C_nk), fill_value=False)
 
-    # Assign test folds for each simulation
+    # assign test folds for each of the C(n, k) simulations
     for k, pair in enumerate(test_groups):
         i, j = pair
         is_test_group[[i, j], k] = True
+
+        # assigning the test folds
         mask = (group_num == i) | (group_num == j)
         is_test[mask, k] = True
 
-    # Connect folds to form backtest paths
+    # for each path, connect the folds from different simulations to form a backtest path
+    # the fold coordinates are: the fold number, and the simulation index e.g. simulation 0, fold 0 etc
     path_folds = np.full((n, n_paths), fill_value=np.nan)
+
     for i in range(n_paths):
         for j in range(n):
             s_idx = is_test_group[j, :].argmax().astype(int)
@@ -315,8 +318,9 @@ def back_test_paths_generator(X, y, cv, t_span, n, k, prediction_times, evaluati
             is_test_group[j, s_idx] = False
             cv.split(X, y, pred_times=prediction_times, eval_times=evaluation_times)
 
-    # Indicate simulation for each path
+    # finally, for each path we indicate which simulation we're building the path from and the time indices
     paths = np.full((t_span, n_paths), fill_value=np.nan)
+
     for p in range(n_paths):
         for i in range(n):
             mask = (group_num == i)
@@ -326,18 +330,21 @@ def back_test_paths_generator(X, y, cv, t_span, n, k, prediction_times, evaluati
 
 
 def plot_cv_indices(cv, X, y, group, ax, n_paths, k, paths, prediction_times, evaluation_times, lw=5):
-    """
-    Create a sample plot for indices of a cross-validation object.
-    """
+    """Create a sample plot for indices of a cross-validation object."""
+    # generate the combinations
     N = n_paths + 1
     test_groups = np.array(list(itt.combinations(np.arange(N), k))).reshape(-1, k)
     n_splits = len(test_groups)
 
+    # Generate the training/testing visualizations for each CV split
     for ii, (tr, tt) in enumerate(cv.split(X, y, pred_times=prediction_times, eval_times=evaluation_times)):
+        # Fill in indices with the training/test groups
         indices = np.array([np.nan] * len(X))
         indices[tt] = 1
         indices[tr] = 0
         indices[np.isnan(indices)] = 2
+
+        # Visualize the train_results
         ax.scatter(
             [ii + 0.5] * len(indices),
             range(len(indices)),
@@ -349,9 +356,13 @@ def plot_cv_indices(cv, X, y, group, ax, n_paths, k, paths, prediction_times, ev
             vmax=1.2
         )
 
+    # Formatting
     xlabelz = list(range(n_splits, 0, -1))
-    xticklabels = [str(x) for x in xlabelz]
+    xlabelz = [str(x) for x in xlabelz]
+    xticklabels = xlabelz
+
     ax.yaxis.grid(True)
+
     ax.set(
         xticks=np.arange(n_splits) + 0.45,
         xticklabels=xticklabels,
