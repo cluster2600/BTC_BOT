@@ -64,7 +64,7 @@ def parse_mlx_decision(output: str) -> str:
     return "HOLD"
 
 def ensemble_predict(ydf_model, nn_model, features: dict, mlx_url: str = "http://localhost:1234/v1/completions") -> str:
-    """Predict trading decision using an ensemble of YDF, Core ML NN, and MLX models with improved parsing and validation."""
+    """Predict trading decision using an ensemble of YDF, Core ML NN, and MLX models with enhanced Core ML handling."""
     features = ensure_required_features(features)
 
     # YDF prediction
@@ -80,23 +80,32 @@ def ensemble_predict(ydf_model, nn_model, features: dict, mlx_url: str = "http:/
     if 'classProbability' in nn_pred:
         probs_dict = nn_pred['classProbability']
         nn_probs = np.array([probs_dict.get("HOLD", 0.0), probs_dict.get("BUY", 0.0), probs_dict.get("SELL", 0.0)], dtype=np.float32)
+    elif 'predictedClass' in nn_pred:
+        predicted_class = nn_pred['predictedClass']
+        nn_probs = np.zeros(3, dtype=np.float32)
+        if predicted_class == "HOLD":
+            nn_probs[0] = 1.0
+        elif predicted_class == "BUY":
+            nn_probs[1] = 1.0
+        elif predicted_class == "SELL":
+            nn_probs[2] = 1.0
     else:
-        print("Core ML model did not return class probabilities.")
+        print(f"Core ML model output format is unexpected. Full output: {nn_pred}")
         nn_probs = np.array([1, 0, 0], dtype=np.float32)  # Default to HOLD
 
-    # MLX prediction via LM Studio API
+    # MLX prediction
     prompt = ("Based on the following market features: " +
               ", ".join(f"{k}: {v}" for k, v in features.items()) +
               ". What is the recommended trading action? Answer BUY, SELL, or HOLD.")
-    mlx_output = mlx_generate(prompt, mlx_url, max_tokens=10)  # Reduced for concise output
+    mlx_output = mlx_generate(prompt, mlx_url, max_tokens=10)
     mlx_decision = parse_mlx_decision(mlx_output)
     mlx_probs = np.array({"BUY": [0, 1, 0], "SELL": [0, 0, 1], "HOLD": [1, 0, 0]}[mlx_decision], dtype=np.float32)
 
     # Ensure all probability arrays have shape (3,)
     if ydf_probs.shape != (3,) or nn_probs.shape != (3,) or mlx_probs.shape != (3,):
-        raise ValueError("Probability arrays have inconsistent shapes.")
+        raise ValueError(f"Probability arrays have inconsistent shapes: YDF {ydf_probs.shape}, NN {nn_probs.shape}, MLX {mlx_probs.shape}")
 
-    # Average probabilities
+    # Average probabilities and determine decision
     avg_probs = np.mean([ydf_probs, nn_probs, mlx_probs], axis=0)
     classes = ["HOLD", "BUY", "SELL"]
     final_decision = classes[np.argmax(avg_probs)]

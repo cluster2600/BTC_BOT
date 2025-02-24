@@ -171,6 +171,7 @@ TRADE_PERCENTAGE = 0.10
 
 def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price: float) -> Optional[float]:
     """Adjust quantity to comply with minimums and balance constraints."""
+    global current_position
     try:
         filters = exchange_futures.markets[symbol]['info'].get('filters', [])
         lot_step = next((float(f.get('stepSize')) for f in filters if f.get('filterType') == 'LOT_SIZE'), 1e-8)
@@ -179,10 +180,11 @@ def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price
             final_qty = max(calculated_qty, MIN_USDT / current_price)
             available_usdt = float(bal.get('USDT', {}).get("free", 0))
             final_qty = min(final_qty, available_usdt / current_price)
-        elif side.upper() == 'SELL':
-            final_qty = max(calculated_qty, max(MIN_BTC, MIN_USDT / current_price))
-            available_btc = float(bal.get('BTC', {}).get("free", 0))
-            final_qty = min(final_qty, available_btc)
+        elif side.upper() == 'SELL' and current_position > 0:
+            final_qty = min(calculated_qty, current_position)  # Limit to current position
+            if final_qty <= 0:
+                print_info(f"Calculated SELL quantity {final_qty} is invalid for {symbol}")
+                return None
         else:
             return None
         return math.floor(final_qty / lot_step) * lot_step
@@ -191,22 +193,28 @@ def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price
         return None
 
 def execute_order(symbol: str, decision: str, final_quantity: float, current_price: float) -> Optional[Dict[str, Any]]:
-    """Execute a market order."""
+    """Execute a market order with reduceOnly for SELL to close positions."""
     global current_position, entry_price
     try:
-        if decision.upper() == "BUY":
+        if decision.upper() == "BUY" and (current_position is None or current_position == 0):
             order = exchange_futures.create_market_buy_order(symbol, final_quantity, params={"reduceOnly": False})
             current_position = final_quantity
             entry_price = current_price
-        elif decision.upper() == "SELL":
-            order = exchange_futures.create_market_sell_order(symbol, final_quantity, params={"reduceOnly": False})
+            print_info(f"[TRADE] BUY {final_quantity} units at {current_price} USDT")
+            telegram_notify(f"[TRADE] BUY {final_quantity} units at {current_price} USDT")
+        elif decision.upper() == "SELL" and current_position is not None and current_position > 0:
+            order = exchange_futures.create_market_sell_order(symbol, final_quantity, params={"reduceOnly": True})
             current_position = 0.0
             entry_price = None
-        print_info(f"[TRADE] {decision.upper()} {final_quantity} units at {current_price} USDT")
-        telegram_notify(f"[TRADE] {decision.upper()} {final_quantity} units at {current_price} USDT")
+            print_info(f"[TRADE] SELL {final_quantity} units at {current_price} USDT")
+            telegram_notify(f"[TRADE] SELL {final_quantity} units at {current_price} USDT")
+        else:
+            print_info(f"No valid position action for {decision} on {symbol}")
+            return None
         return order
     except Exception as e:
         print_error(f"Error executing {decision.upper()} order: {e}")
+        telegram_notify(f"ALERT: Error executing {decision.upper()} order: {e}")
         return None
 
 # Model Loading
@@ -273,15 +281,8 @@ def trading_logic(symbol: str, last_trade_time: Dict[str, float]) -> Dict[str, f
             print_info(f"Cooldown active for {symbol}.")
             return last_trade_time
 
-        if decision == "BUY" and current_position:
-            print_info(f"Already holding position in {symbol}. No BUY executed.")
-            return last_trade_time
-        if decision == "SELL" and not current_position:
-            print_info(f"No position to sell in {symbol}.")
-            return last_trade_time
-
         bal = exchange_futures.fetch_balance({'type': 'future'})
-        qty = TRADE_PERCENTAGE * (float(bal.get('USDT', {}).get("free", 0)) / current_price if decision == "BUY" else current_position)
+        qty = TRADE_PERCENTAGE * (float(bal.get('USDT', {}).get("free", 0)) / current_price if decision == "BUY" else current_position if current_position else 0)
         final_qty = adjust_quantity(symbol, decision, qty, current_price)
         if final_qty and final_qty > 0:
             execute_order(symbol, decision, final_qty, current_price)
