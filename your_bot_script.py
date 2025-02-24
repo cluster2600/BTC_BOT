@@ -232,7 +232,6 @@ def calculate_indicators(df: pd.DataFrame) -> Dict[str, float]:
         indicators = {}
         required_ohlcv = ['open', 'high', 'low', 'close']
 
-        # Calculate SMA, ATR, ADX from OHLCV
         if all(col in df.columns for col in required_ohlcv):
             print_info("Full OHLCV data available, calculating indicators...")
             indicators['rsi'] = ta.momentum.RSIIndicator(df['close'], window=14).rsi().iloc[-1]
@@ -277,26 +276,45 @@ def adjust_quantity(symbol: str, side: str, calculated_qty: float, current_price
         lot_step = next((float(f.get('stepSize')) for f in filters if f.get('filterType') == 'LOT_SIZE'), 1e-8)
         bal = exchange_futures.fetch_balance({'type': 'future'})
         free_usdt = float(bal.get('USDT', {}).get("free", 0))
+        print_info(f"Free USDT balance: {free_usdt:.2f}")
         if free_usdt < MIN_USDT:
             print_info(f"Insufficient USDT balance ({free_usdt:.2f} < {MIN_USDT}), skipping trade")
             return None
+        
+        min_usdt_trade = 100.0  # Binance minimum order value
+        min_btc_qty = min_usdt_trade / current_price  # Minimum BTC quantity for 100 USDT
+        
         margin_required = (calculated_qty * current_price) / current_leverage
         if side.upper() == 'BUY':
-            final_qty = max(calculated_qty, MIN_USDT / current_price)
+            final_qty = max(calculated_qty, min_btc_qty)  # Start with calculated or minimum
             if margin_required > free_usdt:
                 final_qty = (free_usdt * current_leverage) / current_price
                 print_info(f"Adjusted qty due to margin: {final_qty:.8f}")
-            final_qty = min(final_qty, free_usdt / current_price)
+            final_qty = min(final_qty, free_usdt / current_price)  # Cap by available funds
+            
+            # Round up to the next lot step that meets or exceeds 100 USDT
+            adjusted_qty = math.ceil(final_qty / lot_step) * lot_step
+            trade_value = adjusted_qty * current_price
+            if trade_value < min_usdt_trade:
+                adjusted_qty = math.ceil(min_btc_qty / lot_step) * lot_step  # Force minimum
+                trade_value = adjusted_qty * current_price
+                if trade_value < min_usdt_trade:
+                    print_info(f"Cannot adjust qty to meet {min_usdt_trade} USDT minimum, skipping trade")
+                    return None
+            if adjusted_qty * current_price / current_leverage > free_usdt:
+                print_info(f"Adjusted qty {adjusted_qty:.8f} requires {adjusted_qty * current_price / current_leverage:.2f} USDT margin, exceeds free USDT {free_usdt:.2f}, skipping trade")
+                return None
         elif side.upper() == 'SELL' and current_position > 0:
             final_qty = min(calculated_qty, current_position)
-            if final_qty <= 0:
-                print_info(f"Invalid SELL qty: {final_qty}")
+            adjusted_qty = math.floor(final_qty / lot_step) * lot_step
+            if adjusted_qty <= 0 or adjusted_qty * current_price < min_usdt_trade:
+                print_info(f"Invalid SELL qty: {adjusted_qty}, value {adjusted_qty * current_price:.2f} USDT below minimum")
                 return None
         else:
             print_info(f"No adjustment for {side} with position {current_position}")
             return None
-        adjusted_qty = math.floor(final_qty / lot_step) * lot_step
-        print_info(f"Adjusted quantity: {adjusted_qty}")
+        
+        print_info(f"Adjusted quantity: {adjusted_qty:.8f}, value: {adjusted_qty * current_price:.2f} USDT")
         return adjusted_qty
     except Exception as e:
         print_error(f"Error adjusting quantity: {e}")
@@ -348,20 +366,17 @@ def trading_logic(symbol: str, binance_data: pd.DataFrame, yahoo_data: pd.DataFr
     print_info(f"Binance data shape: {binance_data.shape if not binance_data.empty else 'empty'}, columns: {binance_data.columns.tolist() if not binance_data.empty else 'none'}")
     print_info(f"Yahoo data shape: {yahoo_data.shape if not yahoo_data.empty else 'empty'}, columns: {yahoo_data.columns.tolist() if not yahoo_data.empty else 'none'}")
 
-    # Use cached OHLCV for raw data
     ohlcv = get_ohlcv_cached(symbol)
     if ohlcv.empty or len(ohlcv) < 200:
         print_info(f"Insufficient OHLCV data, rows: {len(ohlcv)}")
         return
 
     indicators = calculate_indicators(ohlcv)
-    # Overlay processed indicators from binance_data if available
     if not binance_data.empty and len(binance_data) > 0:
         for ind in ['rsi', 'macd', 'cci', 'dx']:
             if ind in binance_data.columns:
                 indicators[ind] = float(binance_data[ind].iloc[-1])
                 print_info(f"Overlaid processed {ind}: {indicators[ind]}")
-    # Use dx as ADX if available
     if 'dx' in indicators:
         indicators['adx'] = indicators['dx']
         print_info(f"Using overlaid dx as adx: {indicators['adx']}")
@@ -419,7 +434,7 @@ def trading_logic(symbol: str, binance_data: pd.DataFrame, yahoo_data: pd.DataFr
         conditions = {
             "ATR <= 0.01 * Price": indicators['atr'] <= 0.01 * current_price,
             "ADX > 20": indicators['adx'] > 20,
-            "Price > SMA_200 or SMA_20": (current_price > indicators['sma_200']) or (current_price > indicators['sma_20']),
+            # Temporarily remove SMA condition to test
             "RSI < 70": indicators['rsi'] < 70
         }
         for cond, met in conditions.items():
@@ -438,8 +453,12 @@ def trading_logic(symbol: str, binance_data: pd.DataFrame, yahoo_data: pd.DataFr
             print_info(f"Added VIX to features: {features['vix']}")
         print_info(f"Features for ensemble model: {features}")
 
-        decision, confidence = get_ensemble_decision(features, ydf_model, nn_model, mlx_url=MLX_SERVER_URL)
-        print_info(f"Ensemble decision: {decision}, Confidence: {confidence:.4f}")
+        # Force BUY for testing (remove after one successful trade)
+        decision, confidence = "BUY", 0.8  # Temporary override
+        print_info(f"Forcing Ensemble decision: {decision}, Confidence: {confidence:.4f}")
+        # Uncomment below to restore original logic after testing
+        # decision, confidence = get_ensemble_decision(features, ydf_model, nn_model, mlx_url=MLX_SERVER_URL)
+        # print_info(f"Ensemble decision: {decision}, Confidence: {confidence:.4f}")
 
         conditions.update({
             "Decision == BUY": decision == "BUY",
